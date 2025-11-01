@@ -1,4 +1,7 @@
-import { User } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+
+// Define User type based on Prisma's generated types
+type User = Prisma.UserGetPayload<{}>;
 
 export type UserRole = "admin" | "editor" | "viewer";
 
