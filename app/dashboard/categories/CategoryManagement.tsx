@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Breadcrumb } from "@/app/components/Breadcrumb";
-import { Plus, Edit2, Trash2, Folder, Save, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Folder, Save, X, Loader2 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
 
 interface NavHeader {
@@ -31,6 +31,7 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newCategory, setNewCategory] = useState({ label: "", slug: "", parentId: null as string | null });
   const [isAddingNew, setIsAddingNew] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
     if (!newCategory.label.trim()) {
@@ -46,6 +47,7 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
     }
 
     try {
+      setCreating(true);
       const response = await fetch('/api/nav-headers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -67,6 +69,8 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
     } catch (error) {
       console.error('Failed to create category:', error);
       alert('Failed to create category');
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -229,9 +233,19 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
                   <button
                     onClick={handleCreate}
                     className="btn-primary flex items-center space-x-2"
+                    disabled={creating}
                   >
-                    <Save className="w-4 h-4" />
-                    <span>Create</span>
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Creating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Create</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>

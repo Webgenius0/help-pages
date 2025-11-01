@@ -12,6 +12,7 @@ import {
   ChevronDown,
   FileText,
   Globe,
+  Loader2,
 } from "lucide-react";
 import { useAutosave } from "@/hooks/useAutosave";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
@@ -404,7 +405,11 @@ export default function PageEditorClient({
                   disabled={saving}
                   className="btn-primary flex items-center space-x-2"
                 >
-                  <Save size={16} />
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
                   <span>{saving ? "Saving..." : "Save Changes"}</span>
                 </button>
               ) : (
@@ -413,7 +418,11 @@ export default function PageEditorClient({
                   disabled={saving}
                   className="btn-primary flex items-center space-x-2"
                 >
-                  <Save size={16} />
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save size={16} />
+                  )}
                   <span>{saving ? "Publishing..." : "Publish"}</span>
                 </button>
               )}
