@@ -163,6 +163,9 @@ export function DocManagementClient({
 
     try {
       setCreatingSection(true);
+      // Allow React to re-render with loading state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       const response = await fetch(
         `/api/nav-headers?docId=${encodeURIComponent(doc.id)}`,
         {
@@ -218,6 +221,9 @@ export function DocManagementClient({
 
     try {
       setCreatingPage(true);
+      // Allow React to re-render with loading state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       const response = await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -540,7 +546,7 @@ export function DocManagementClient({
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary"
+                    className="btn-primary flex items-center justify-center"
                     disabled={creatingSection}
                   >
                     {creatingSection ? (
@@ -634,7 +640,7 @@ export function DocManagementClient({
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary"
+                    className="btn-primary flex items-center justify-center"
                     disabled={creatingPage}
                   >
                     {creatingPage ? (
