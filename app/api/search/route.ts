@@ -163,14 +163,25 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const headerResults = navHeaders.map((header) => ({
-      id: header.id,
-      title: highlightText(header.label, query),
-      slug: header.slug,
-      type: "category",
-      parent: header.parent?.label,
-      url: `/dashboard/pages?header=${header.id}`,
-    }));
+    const headerResults = navHeaders.map(
+      (header: {
+        id: string;
+        label: string;
+        slug: string;
+        icon: string | null;
+        parent: {
+          label: string;
+          slug: string;
+        } | null;
+      }) => ({
+        id: header.id,
+        title: highlightText(header.label, query),
+        slug: header.slug,
+        type: "category",
+        parent: header.parent?.label,
+        url: `/dashboard/pages?header=${header.id}`,
+      })
+    );
 
     return NextResponse.json({
       query: query.trim(),

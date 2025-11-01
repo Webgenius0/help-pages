@@ -57,7 +57,27 @@ export async function GET() {
 
     // Organize pages by nav header and parent-child relationships
     const organized = pages.reduce(
-      (acc: Record<string, { header: any; pages: any[] }>, page) => {
+      (
+        acc: Record<string, { header: any; pages: any[] }>,
+        page: {
+          id: string;
+          title: string;
+          slug: string;
+          summary: string | null;
+          parentId: string | null;
+          navHeaderId: string | null;
+          position: number;
+          user: {
+            username: string;
+          };
+          navHeader: {
+            id: string;
+            label: string;
+            slug: string;
+            position: number;
+          } | null;
+        }
+      ) => {
         const headerKey = page.navHeaderId || "none";
         if (!acc[headerKey]) {
           acc[headerKey] = {
