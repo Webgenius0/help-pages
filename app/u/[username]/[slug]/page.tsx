@@ -30,7 +30,7 @@ export default async function UserPageView({
 
   // Note: Pages now inherit visibility from their parent Doc
   // For legacy /u/[username]/[slug] route, we check if the page's doc is public
-  const page = await prisma.page.findFirst({
+  const page = (await (prisma as any).page.findFirst({
     where: {
       userId: user.id,
       slug,
@@ -57,12 +57,12 @@ export default async function UserPageView({
         orderBy: { position: "asc" },
       },
     },
-  });
+  })) as any;
 
   if (!page) {
     console.log(`Page not found - slug: ${slug}, userId: ${user.id}`);
     // Log available pages for debugging
-    const availablePages = await prisma.page.findMany({
+    const availablePages = await (prisma as any).page.findMany({
       where: {
         userId: user.id,
       },
@@ -76,7 +76,7 @@ export default async function UserPageView({
             isPublic: true,
           },
         },
-      },
+      } as any,
     });
     console.log(`All pages for user ${username}:`, availablePages);
     notFound();
@@ -160,22 +160,29 @@ export default async function UserPageView({
                   Related Pages
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {page.children.map((child) => (
-                    <Link
-                      key={child.id}
-                      href={`/u/${username}/${child.slug}`}
-                      className="group block p-6 bg-card rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200"
-                    >
-                      <h3 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                        {child.title}
-                      </h3>
-                      {child.summary && (
-                        <p className="text-sm text-muted-foreground">
-                          {child.summary}
-                        </p>
-                      )}
-                    </Link>
-                  ))}
+                  {page.children.map(
+                    (child: {
+                      id: string;
+                      slug: string;
+                      title: string;
+                      summary: string | null;
+                    }) => (
+                      <Link
+                        key={child.id}
+                        href={`/u/${username}/${child.slug}`}
+                        className="group block p-6 bg-card rounded-lg border border-border hover:border-primary/50 hover:shadow-md transition-all duration-200"
+                      >
+                        <h3 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
+                          {child.title}
+                        </h3>
+                        {child.summary && (
+                          <p className="text-sm text-muted-foreground">
+                            {child.summary}
+                          </p>
+                        )}
+                      </Link>
+                    )
+                  )}
                 </div>
               </div>
             )}
