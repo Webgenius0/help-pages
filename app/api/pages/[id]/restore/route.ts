@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-config';
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
 
 export async function POST(
   request: NextRequest,
@@ -12,7 +12,7 @@ export async function POST(
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const user = await prisma.user.findUnique({
@@ -20,14 +20,14 @@ export async function POST(
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     const { revisionId } = await request.json();
 
     if (!revisionId) {
       return NextResponse.json(
-        { error: 'Missing revisionId' },
+        { error: "Missing revisionId" },
         { status: 400 }
       );
     }
@@ -37,12 +37,16 @@ export async function POST(
     });
 
     if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
     // Check permissions
-    if (user.id !== page.userId && user.role !== 'admin' && user.role !== 'editor') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (
+      user.id !== page.userId &&
+      user.role !== "admin" &&
+      user.role !== "editor"
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const revision = await prisma.pageRevision.findUnique({
@@ -51,7 +55,7 @@ export async function POST(
 
     if (!revision || revision.pageId !== pageId) {
       return NextResponse.json(
-        { error: 'Revision not found' },
+        { error: "Revision not found" },
         { status: 404 }
       );
     }
@@ -66,10 +70,10 @@ export async function POST(
           content: page.content,
           summary: page.summary,
           status: page.status,
-          isPublic: page.isPublic,
+          // Note: isPublic removed - pages inherit visibility from parent Doc
         },
-        changeLog: 'Backup before restore',
-      },
+        changeLog: "Backup before restore",
+      } as any,
     });
 
     // Restore the page from the revision
@@ -81,10 +85,12 @@ export async function POST(
         content: snapshot.content,
         summary: snapshot.summary || null,
         status: snapshot.status,
-        isPublic: snapshot.isPublic ?? page.isPublic,
+        // Note: isPublic removed - pages inherit visibility from parent Doc
         lastEditedBy: user.username || user.email,
-        searchIndex: `${snapshot.title} ${snapshot.content} ${snapshot.summary || ''}`.toLowerCase(),
-      },
+        searchIndex: `${snapshot.title} ${snapshot.content} ${
+          snapshot.summary || ""
+        }`.toLowerCase(),
+      } as any,
     });
 
     // Create a new revision for the restore action
@@ -97,22 +103,23 @@ export async function POST(
           content: updatedPage.content,
           summary: updatedPage.summary,
           status: updatedPage.status,
-          isPublic: updatedPage.isPublic,
+          // Note: isPublic removed - pages inherit visibility from parent Doc
         },
-        changeLog: `Restored from version ${new Date(revision.createdAt).toLocaleString()}`,
-      },
+        changeLog: `Restored from version ${new Date(
+          revision.createdAt
+        ).toLocaleString()}`,
+      } as any,
     });
 
     return NextResponse.json({
-      message: 'Page restored successfully',
+      message: "Page restored successfully",
       page: updatedPage,
     });
   } catch (error) {
-    console.error('Failed to restore page:', error);
+    console.error("Failed to restore page:", error);
     return NextResponse.json(
-      { error: 'Failed to restore page' },
+      { error: "Failed to restore page" },
       { status: 500 }
     );
   }
 }
-

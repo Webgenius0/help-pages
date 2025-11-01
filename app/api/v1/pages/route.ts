@@ -68,8 +68,12 @@ export async function GET(request: NextRequest) {
       where.status = status;
     }
 
+    // Note: Pages inherit visibility from parent Doc
+    // Filter by doc.isPublic if isPublic parameter is provided
     if (isPublic !== null) {
-      where.isPublic = isPublic === 'true';
+      where.doc = {
+        isPublic: isPublic === 'true',
+      };
     }
 
     const [pages, total] = await Promise.all([
@@ -81,11 +85,16 @@ export async function GET(request: NextRequest) {
           slug: true,
           summary: true,
           status: true,
-          isPublic: true,
           viewCount: true,
           publishedAt: true,
           createdAt: true,
           updatedAt: true,
+          docId: true,
+          doc: {
+            select: {
+              isPublic: true,
+            },
+          },
           navHeader: {
             select: {
               label: true,
@@ -150,7 +159,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, slug, content, summary, status, isPublic, navHeaderId } = body;
+    const { title, slug, content, summary, status, isPublic: _isPublic, navHeaderId, docId } = body;
+
+    // Remove isPublic from body if present (Pages don't have isPublic - it's inherited from Doc)
+    if (_isPublic !== undefined) {
+      console.warn('Ignoring isPublic field in request - Pages inherit visibility from their parent Doc');
+    }
 
     if (!title || !slug || !content) {
       return NextResponse.json(
@@ -159,19 +173,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if slug already exists for this user
-    const existingPage = await prisma.page.findUnique({
+    if (!docId) {
+      return NextResponse.json(
+        { error: 'Missing required field: docId' },
+        { status: 400 }
+      );
+    }
+
+    // Verify doc exists and user has access
+    const doc = await (prisma as any).doc.findUnique({
+      where: { id: docId },
+    });
+
+    if (!doc) {
+      return NextResponse.json(
+        { error: 'Document not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check permissions
+    const isOwner = doc.userId === user.id;
+    const isAdmin = user.role === 'admin';
+    const isEditor = user.role === 'editor';
+
+    if (!isOwner && !isAdmin && !isEditor) {
+      return NextResponse.json(
+        { error: 'Forbidden: Cannot create pages in this document' },
+        { status: 403 }
+      );
+    }
+
+    // Check if slug already exists for this doc
+    const existingPage = await prisma.page.findFirst({
       where: {
-        userId_slug: {
-          userId: user.id,
-          slug,
-        },
+        docId: docId,
+        slug,
       },
     });
 
     if (existingPage) {
       return NextResponse.json(
-        { error: 'A page with this slug already exists' },
+        { error: 'A page with this slug already exists in this document' },
         { status: 409 }
       );
     }
@@ -182,16 +225,17 @@ export async function POST(request: NextRequest) {
     const page = await prisma.page.create({
       data: {
         userId: user.id,
+        docId: docId,
         title,
         slug,
         content,
         summary: summary || null,
         status: status || 'draft',
-        isPublic: isPublic ?? false,
+        // Note: isPublic removed - pages inherit visibility from parent Doc
         navHeaderId: navHeaderId || null,
         searchIndex,
         publishedAt: status === 'published' ? new Date() : null,
-      },
+      } as any,
       include: {
         navHeader: {
           select: {

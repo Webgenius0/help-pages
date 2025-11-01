@@ -27,19 +27,33 @@ export default async function UserPageView({
   }
 
   console.log(`Looking for page with slug: ${slug}, userId: ${user.id}`);
-  
+
+  // Note: Pages now inherit visibility from their parent Doc
+  // For legacy /u/[username]/[slug] route, we check if the page's doc is public
   const page = await prisma.page.findFirst({
     where: {
       userId: user.id,
       slug,
       status: "published",
-      isPublic: true,
+      doc: {
+        isPublic: true,
+      },
     },
     include: {
       navHeader: true,
       parent: true,
+      doc: {
+        select: {
+          isPublic: true,
+        },
+      },
       children: {
-        where: { status: "published", isPublic: true },
+        where: {
+          status: "published",
+          doc: {
+            isPublic: true,
+          },
+        },
         orderBy: { position: "asc" },
       },
     },
@@ -56,7 +70,12 @@ export default async function UserPageView({
         slug: true,
         title: true,
         status: true,
-        isPublic: true,
+        docId: true,
+        doc: {
+          select: {
+            isPublic: true,
+          },
+        },
       },
     });
     console.log(`All pages for user ${username}:`, availablePages);

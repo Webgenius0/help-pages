@@ -44,9 +44,12 @@ export async function GET(request: NextRequest) {
     };
 
     // If user is not logged in or doesn't want private pages, only show public pages
+    // Pages inherit visibility from their parent Doc
     if (!session?.user || !includePrivate) {
-      whereClause.isPublic = true;
       whereClause.status = 'published';
+      whereClause.doc = {
+        isPublic: true,
+      };
     } else if (session?.user?.email) {
       // Show published pages or user's own drafts
       const user = await prisma.user.findUnique({
@@ -69,9 +72,14 @@ export async function GET(request: NextRequest) {
         slug: true,
         summary: true,
         content: true,
-        isPublic: true,
         status: true,
         updatedAt: true,
+        docId: true,
+        doc: {
+          select: {
+            isPublic: true,
+          },
+        },
         user: {
           select: {
             username: true,
@@ -130,7 +138,7 @@ export async function GET(request: NextRequest) {
         slug: page.slug,
         summary: summaryPreview || contentPreview,
         type: 'page',
-        isPublic: page.isPublic,
+        isPublic: page.doc?.isPublic ?? false, // Pages inherit visibility from parent Doc
         status: page.status,
         updatedAt: page.updatedAt,
         author: page.user.fullName || page.user.username,

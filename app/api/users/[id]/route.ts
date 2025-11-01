@@ -43,7 +43,7 @@ export async function GET(
         _count: {
           select: {
             pages: true,
-            navHeaders: true,
+            docs: true,
           },
         },
       },

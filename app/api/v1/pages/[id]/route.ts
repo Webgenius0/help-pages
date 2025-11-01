@@ -44,6 +44,11 @@ export async function GET(
             slug: true,
           },
         },
+        doc: {
+          select: {
+            isPublic: true,
+          },
+        },
         revisions: {
           select: {
             id: true,
@@ -67,8 +72,9 @@ export async function GET(
       return NextResponse.json({ error: 'Page not found' }, { status: 404 });
     }
 
-    // Check permissions
-    if (!page.isPublic && page.status === 'draft') {
+    // Check permissions - pages inherit visibility from parent Doc
+    const isPublic = page.doc?.isPublic ?? false;
+    if (!isPublic && page.status === 'draft') {
       if (!user || (user.id !== page.userId && user.role !== 'admin' && user.role !== 'editor')) {
         return NextResponse.json(
           { error: 'Unauthorized: Cannot access this page' },
@@ -131,7 +137,12 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { title, content, summary, status, isPublic } = body;
+    const { title, content, summary, status, isPublic: _isPublic } = body;
+
+    // Remove isPublic from body if present (Pages don't have isPublic - it's inherited from Doc)
+    if (_isPublic !== undefined) {
+      console.warn('Ignoring isPublic field in request - Pages inherit visibility from their parent Doc');
+    }
 
     const updateData: any = {
       lastEditedBy: user.username || user.email,
@@ -146,7 +157,6 @@ export async function PATCH(
         updateData.publishedAt = new Date();
       }
     }
-    if (isPublic !== undefined) updateData.isPublic = isPublic;
 
     // Update search index if content changed
     if (title || content || summary) {
@@ -166,9 +176,9 @@ export async function PATCH(
           content: page.content,
           summary: page.summary,
           status: page.status,
-          isPublic: page.isPublic,
+          // Note: isPublic removed - pages inherit visibility from parent Doc
         },
-      },
+      } as any,
     });
 
     const updatedPage = await prisma.page.update({

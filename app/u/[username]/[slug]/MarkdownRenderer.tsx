@@ -7,7 +7,7 @@ interface MarkdownRendererProps {
 export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
   const renderContent = () => {
     const lines = content.split('\n')
-    const elements: JSX.Element[] = []
+    const elements: React.JSX.Element[] = []
     let inCodeBlock = false
     let codeLines: string[] = []
     let codeLanguage = ''

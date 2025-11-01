@@ -1,6 +1,6 @@
-import { User } from '@prisma/client';
+import { User } from "@prisma/client";
 
-export type UserRole = 'admin' | 'editor' | 'viewer';
+export type UserRole = "admin" | "editor" | "viewer";
 
 export interface Permission {
   canCreate: boolean;
@@ -17,7 +17,7 @@ export interface Permission {
  */
 export function getPermissions(role: UserRole): Permission {
   switch (role) {
-    case 'admin':
+    case "admin":
       return {
         canCreate: true,
         canEdit: true,
@@ -27,7 +27,7 @@ export function getPermissions(role: UserRole): Permission {
         canManageSettings: true,
         canViewAnalytics: true,
       };
-    case 'editor':
+    case "editor":
       return {
         canCreate: true,
         canEdit: true,
@@ -37,7 +37,7 @@ export function getPermissions(role: UserRole): Permission {
         canManageSettings: false,
         canViewAnalytics: true,
       };
-    case 'viewer':
+    case "viewer":
       return {
         canCreate: false,
         canEdit: false,
@@ -64,7 +64,7 @@ export function getPermissions(role: UserRole): Permission {
  * Check if a user can perform an action
  */
 export function canPerformAction(
-  user: Pick<User, 'role'> | null,
+  user: Pick<User, "role"> | null,
   action: keyof Permission
 ): boolean {
   if (!user) return false;
@@ -77,13 +77,13 @@ export function canPerformAction(
  * Check if a user can edit a specific page
  */
 export function canEditPage(
-  user: Pick<User, 'id' | 'role'> | null,
+  user: Pick<User, "id" | "role"> | null,
   pageUserId: string
 ): boolean {
   if (!user) return false;
 
   // Admins and editors can edit any page
-  if (user.role === 'admin' || user.role === 'editor') {
+  if (user.role === "admin" || user.role === "editor") {
     return true;
   }
 
@@ -95,13 +95,13 @@ export function canEditPage(
  * Check if a user can delete a specific page
  */
 export function canDeletePage(
-  user: Pick<User, 'id' | 'role'> | null,
+  user: Pick<User, "id" | "role"> | null,
   pageUserId: string
 ): boolean {
   if (!user) return false;
 
   // Only admins can delete pages
-  if (user.role === 'admin') {
+  if (user.role === "admin") {
     return true;
   }
 
@@ -110,23 +110,25 @@ export function canDeletePage(
 
 /**
  * Check if a user can view a page based on its visibility
+ * Note: Pages inherit visibility from their parent Doc
  */
 export function canViewPage(
-  user: Pick<User, 'id' | 'role'> | null,
-  page: { isPublic: boolean; userId: string; status: string }
+  user: Pick<User, "id" | "role"> | null,
+  page: { userId: string; status: string },
+  doc?: { isPublic: boolean } | null
 ): boolean {
-  // Public published pages are visible to everyone
-  if (page.isPublic && page.status === 'published') {
+  // Public published pages from public docs are visible to everyone
+  if (doc?.isPublic && page.status === "published") {
     return true;
   }
 
-  // If no user, they can only see public pages
+  // If no user, they can only see public pages from public docs
   if (!user) {
     return false;
   }
 
   // Admins and editors can see all pages
-  if (user.role === 'admin' || user.role === 'editor') {
+  if (user.role === "admin" || user.role === "editor") {
     return true;
   }
 
@@ -139,18 +141,20 @@ export function canViewPage(
  * Throws an error if the user doesn't have permission
  */
 export function requireRole(
-  user: Pick<User, 'role'> | null,
+  user: Pick<User, "role"> | null,
   requiredRole: UserRole | UserRole[]
 ): void {
   if (!user) {
-    throw new Error('Unauthorized: User not authenticated');
+    throw new Error("Unauthorized: User not authenticated");
   }
 
   const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
 
   if (!roles.includes(user.role as UserRole)) {
     throw new Error(
-      `Unauthorized: Requires ${roles.join(' or ')} role, but user has ${user.role} role`
+      `Unauthorized: Requires ${roles.join(" or ")} role, but user has ${
+        user.role
+      } role`
     );
   }
 }
@@ -159,7 +163,7 @@ export function requireRole(
  * Check if user has any of the specified roles
  */
 export function hasRole(
-  user: Pick<User, 'role'> | null,
+  user: Pick<User, "role"> | null,
   role: UserRole | UserRole[]
 ): boolean {
   if (!user) return false;

@@ -23,7 +23,7 @@ export default async function PageEditorPage({
     redirect("/auth/login");
   }
 
-  const page = await prisma.page.findUnique({
+  const page = await (prisma as any).page.findUnique({
     where: { id },
     include: {
       navHeader: true,
@@ -36,12 +36,17 @@ export default async function PageEditorPage({
     },
   });
 
+  if (!page) {
+    redirect("/dashboard");
+  }
+
   // Check permissions: owner, admin, or editor can access
-  const isOwner = page.doc.userId === profile.id;
+  const pageDoc = page.doc as { id: string; userId: string } | null;
+  const isOwner = pageDoc?.userId === profile.id;
   const isAdmin = profile.role === "admin";
   const isEditor = profile.role === "editor";
 
-  if (!page || (!isOwner && !isAdmin && !isEditor)) {
+  if (!isOwner && !isAdmin && !isEditor) {
     redirect("/dashboard");
   }
 

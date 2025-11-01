@@ -12,26 +12,29 @@ export default async function UserDocsHomePage({
 
   const user = await prisma.user.findUnique({
     where: { username },
-    include: {
-      navHeaders: {
-        where: { parentId: null },
-        include: {
-          children: {
-            include: {
-              pages: {
-                where: { status: "published", parentId: null, isPublic: true },
-                orderBy: { position: "asc" },
-              },
-            },
-            orderBy: { position: "asc" },
-          },
-          pages: {
-            where: { status: "published", parentId: null, isPublic: true },
-            orderBy: { position: "asc" },
-          },
-        },
-        orderBy: { position: "asc" },
-      },
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      bio: true,
+      isPublic: true,
+    },
+  });
+
+  // Get all public docs for this user
+  const userDocs = await (prisma as any).doc.findMany({
+    where: {
+      userId: user?.id,
+      isPublic: true,
+    },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      description: true,
+    },
+    orderBy: {
+      updatedAt: 'desc',
     },
   });
 
@@ -67,36 +70,31 @@ export default async function UserDocsHomePage({
     );
   }
 
-  // Get the first published page as a landing page
-  // Check top-level pages first, then nested pages
-  let firstPage = user.navHeaders[0]?.pages[0];
-  
-  // If no page in first header, check children
-  if (!firstPage && user.navHeaders[0]?.children?.[0]) {
-    firstPage = user.navHeaders[0].children[0].pages[0];
-  }
-  
-  // If still no page, check all headers
-  if (!firstPage) {
-    for (const header of user.navHeaders) {
-      if (header.pages && header.pages.length > 0) {
-        firstPage = header.pages[0];
-        break;
-      }
-      if (header.children) {
-        for (const child of header.children) {
-          if (child.pages && child.pages.length > 0) {
-            firstPage = child.pages[0];
-            break;
-          }
-        }
-        if (firstPage) break;
-      }
-    }
-  }
+  // If user has public docs, redirect to the first one
+  // Otherwise, show the docs list
+  if (userDocs.length > 0) {
+    // Get the first page from the first doc
+    const firstDoc = userDocs[0];
+    const firstPage = await (prisma as any).page.findFirst({
+      where: {
+        docId: firstDoc.id,
+        status: 'published',
+        parentId: null,
+      },
+      orderBy: {
+        position: 'asc',
+      },
+      select: {
+        slug: true,
+      },
+    });
 
-  if (firstPage) {
-    redirect(`/u/${username}/${firstPage.slug}`);
+    if (firstPage) {
+      redirect(`/docs/${firstDoc.slug}/${firstPage.slug}`);
+    } else {
+      // No pages yet, but doc exists - redirect to doc homepage
+      redirect(`/docs/${firstDoc.slug}`);
+    }
   }
 
   return (
@@ -109,7 +107,7 @@ export default async function UserDocsHomePage({
           <p className="text-lg text-foreground-light mb-8">{user.bio}</p>
         )}
 
-        {user.navHeaders.length === 0 ? (
+        {userDocs.length === 0 ? (
           <div className="mt-12">
             <p className="text-foreground-lighter">
               No documentation published yet.
@@ -117,54 +115,21 @@ export default async function UserDocsHomePage({
           </div>
         ) : (
           <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-left">
-            {user.navHeaders.map((header) => (
-              <div
-                key={header.id}
-                className="bg-surface-100 rounded-lg border border-default p-6"
+            {userDocs.map((doc: any) => (
+              <Link
+                key={doc.id}
+                href={`/docs/${doc.slug}`}
+                className="bg-card rounded-lg border border-border p-6 hover:border-primary/50 hover:shadow-md transition-all duration-200"
               >
-                <h2 className="text-xl font-bold text-foreground mb-4">
-                  {header.label}
+                <h2 className="text-xl font-bold text-foreground mb-2">
+                  {doc.title}
                 </h2>
-                {header.pages.length > 0 && (
-                  <ul className="space-y-2 mb-4">
-                    {header.pages.map((page) => (
-                      <li key={page.id}>
-                        <Link
-                          href={`/u/${username}/${page.slug}`}
-                          className="text-brand hover:underline"
-                        >
-                          {page.title}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
+                {doc.description && (
+                  <p className="text-sm text-muted-foreground">
+                    {doc.description}
+                  </p>
                 )}
-                {header.children && header.children.length > 0 && (
-                  <div className="space-y-3">
-                    {header.children.map((subheader) => (
-                      <div key={subheader.id}>
-                        <h3 className="text-sm font-semibold text-foreground-light mb-2">
-                          {subheader.label}
-                        </h3>
-                        {subheader.pages.length > 0 && (
-                          <ul className="space-y-1 pl-4">
-                            {subheader.pages.map((page) => (
-                              <li key={page.id}>
-                                <Link
-                                  href={`/u/${username}/${page.slug}`}
-                                  className="text-sm text-brand hover:underline"
-                                >
-                                  {page.title}
-                                </Link>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              </Link>
             ))}
           </div>
         )}

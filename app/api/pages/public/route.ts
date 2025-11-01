@@ -4,10 +4,14 @@ import prisma from '@/lib/prisma'
 // GET /api/pages/public - Get all published pages for public navigation
 export async function GET() {
   try {
+    // Pages inherit visibility from their parent Doc
+    // Only show published pages from public docs
     const pages = await prisma.page.findMany({
       where: {
         status: 'published',
-        isPublic: true,
+        doc: {
+          isPublic: true,
+        },
       },
       select: {
         id: true,

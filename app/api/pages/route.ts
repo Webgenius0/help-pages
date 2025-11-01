@@ -37,16 +37,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify doc belongs to user
-    const doc = await prisma.doc.findUnique({
+    const doc = await (prisma as any).doc.findUnique({
       where: { id: docId },
     })
+
+    if (!doc) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
 
     // Allow owner, admin, or editor to create pages
     const isOwner = doc.userId === profile.id
     const isAdmin = profile.role === 'admin'
     const isEditor = profile.role === 'editor'
     
-    if (!doc || (!isOwner && !isAdmin && !isEditor)) {
+    if (!isOwner && !isAdmin && !isEditor) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
@@ -110,16 +114,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify doc belongs to user
-    const doc = await prisma.doc.findUnique({
+    const doc = await (prisma as any).doc.findUnique({
       where: { id: docId },
     })
+
+    if (!doc) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
 
     // Allow owner, admin, or editor to create pages
     const isOwner = doc.userId === profile.id
     const isAdmin = profile.role === 'admin'
     const isEditor = profile.role === 'editor'
     
-    if (!doc || (!isOwner && !isAdmin && !isEditor)) {
+    if (!isOwner && !isAdmin && !isEditor) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
