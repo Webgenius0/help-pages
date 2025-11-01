@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { PublicDocsView } from "./PublicDocsView";
 import { getUser, getProfile } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 export default async function PublicDocPage({
   params,
 }: {

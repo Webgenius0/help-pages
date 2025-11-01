@@ -3,6 +3,8 @@ import { getUser, getProfile } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { DocManagementClient } from "./DocManagementClient";
 
+export const dynamic = "force-dynamic";
+
 export default async function DocManagementPage({
   params,
 }: {
@@ -22,7 +24,7 @@ export default async function DocManagementPage({
   }
 
   // Fetch the doc (include userId for permission checks)
-  const doc = await prisma.doc.findUnique({
+  const doc = await (prisma as any).doc.findUnique({
     where: { id },
     include: {
       navHeaders: {
@@ -101,11 +103,10 @@ export default async function DocManagementPage({
   const isOwner = doc.userId === profile.id;
   const isAdmin = profile.role === "admin";
   const isEditor = profile.role === "editor";
-  
+
   if (!isOwner && !isAdmin && !isEditor) {
     redirect("/dashboard");
   }
 
   return <DocManagementClient doc={doc} profile={profile} />;
 }
-

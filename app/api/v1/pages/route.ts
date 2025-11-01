@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-config';
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
 
 // Helper to verify API key
 async function verifyApiKey(apiKey: string) {
@@ -10,7 +10,7 @@ async function verifyApiKey(apiKey: string) {
   //   where: { key: apiKey },
   //   include: { user: true },
   // });
-  
+
   // if (!key) {
   //   return null;
   // }
@@ -33,11 +33,11 @@ async function verifyApiKey(apiKey: string) {
 // GET /api/v1/pages - List all pages
 export async function GET(request: NextRequest) {
   try {
-    const apiKey = request.headers.get('x-api-key');
+    const apiKey = request.headers.get("x-api-key");
     const session = await getServerSession(authOptions);
 
     let user = null;
-    
+
     // Authenticate via API key or session
     if (apiKey) {
       user = await verifyApiKey(apiKey);
@@ -49,16 +49,16 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Unauthorized: Valid API key or session required' },
+        { error: "Unauthorized: Valid API key or session required" },
         { status: 401 }
       );
     }
 
     const searchParams = request.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
-    const status = searchParams.get('status');
-    const isPublic = searchParams.get('isPublic');
+    const limit = parseInt(searchParams.get("limit") || "50");
+    const offset = parseInt(searchParams.get("offset") || "0");
+    const status = searchParams.get("status");
+    const isPublic = searchParams.get("isPublic");
 
     const where: any = {
       userId: user.id,
@@ -72,12 +72,12 @@ export async function GET(request: NextRequest) {
     // Filter by doc.isPublic if isPublic parameter is provided
     if (isPublic !== null) {
       where.doc = {
-        isPublic: isPublic === 'true',
+        isPublic: isPublic === "true",
       };
     }
 
     const [pages, total] = await Promise.all([
-      prisma.page.findMany({
+      (prisma as any).page.findMany({
         where,
         select: {
           id: true,
@@ -101,12 +101,12 @@ export async function GET(request: NextRequest) {
               slug: true,
             },
           },
-        },
+        } as any,
         take: limit,
         skip: offset,
-        orderBy: { updatedAt: 'desc' },
+        orderBy: { updatedAt: "desc" },
       }),
-      prisma.page.count({ where }),
+      (prisma as any).page.count({ where }),
     ]);
 
     return NextResponse.json({
@@ -119,9 +119,9 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('API error:', error);
+    console.error("API error:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch pages' },
+      { error: "Failed to fetch pages" },
       { status: 500 }
     );
   }
@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
 // POST /api/v1/pages - Create a new page
 export async function POST(request: NextRequest) {
   try {
-    const apiKey = request.headers.get('x-api-key');
+    const apiKey = request.headers.get("x-api-key");
     const session = await getServerSession(authOptions);
 
     let user = null;
@@ -145,37 +145,48 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Unauthorized: Valid API key or session required' },
+        { error: "Unauthorized: Valid API key or session required" },
         { status: 401 }
       );
     }
 
     // Check permissions
-    if (user.role === 'viewer') {
+    if (user.role === "viewer") {
       return NextResponse.json(
-        { error: 'Forbidden: Viewers cannot create pages' },
+        { error: "Forbidden: Viewers cannot create pages" },
         { status: 403 }
       );
     }
 
     const body = await request.json();
-    const { title, slug, content, summary, status, isPublic: _isPublic, navHeaderId, docId } = body;
+    const {
+      title,
+      slug,
+      content,
+      summary,
+      status,
+      isPublic: _isPublic,
+      navHeaderId,
+      docId,
+    } = body;
 
     // Remove isPublic from body if present (Pages don't have isPublic - it's inherited from Doc)
     if (_isPublic !== undefined) {
-      console.warn('Ignoring isPublic field in request - Pages inherit visibility from their parent Doc');
+      console.warn(
+        "Ignoring isPublic field in request - Pages inherit visibility from their parent Doc"
+      );
     }
 
     if (!title || !slug || !content) {
       return NextResponse.json(
-        { error: 'Missing required fields: title, slug, content' },
+        { error: "Missing required fields: title, slug, content" },
         { status: 400 }
       );
     }
 
     if (!docId) {
       return NextResponse.json(
-        { error: 'Missing required field: docId' },
+        { error: "Missing required field: docId" },
         { status: 400 }
       );
     }
@@ -187,40 +198,40 @@ export async function POST(request: NextRequest) {
 
     if (!doc) {
       return NextResponse.json(
-        { error: 'Document not found' },
+        { error: "Document not found" },
         { status: 404 }
       );
     }
 
     // Check permissions
     const isOwner = doc.userId === user.id;
-    const isAdmin = user.role === 'admin';
-    const isEditor = user.role === 'editor';
+    const isAdmin = user.role === "admin";
+    const isEditor = user.role === "editor";
 
     if (!isOwner && !isAdmin && !isEditor) {
       return NextResponse.json(
-        { error: 'Forbidden: Cannot create pages in this document' },
+        { error: "Forbidden: Cannot create pages in this document" },
         { status: 403 }
       );
     }
 
     // Check if slug already exists for this doc
-    const existingPage = await prisma.page.findFirst({
+    const existingPage = await (prisma as any).page.findFirst({
       where: {
         docId: docId,
         slug,
-      },
+      } as any,
     });
 
     if (existingPage) {
       return NextResponse.json(
-        { error: 'A page with this slug already exists in this document' },
+        { error: "A page with this slug already exists in this document" },
         { status: 409 }
       );
     }
 
     // Create search index
-    const searchIndex = `${title} ${content} ${summary || ''}`.toLowerCase();
+    const searchIndex = `${title} ${content} ${summary || ""}`.toLowerCase();
 
     const page = await prisma.page.create({
       data: {
@@ -230,11 +241,11 @@ export async function POST(request: NextRequest) {
         slug,
         content,
         summary: summary || null,
-        status: status || 'draft',
+        status: status || "draft",
         // Note: isPublic removed - pages inherit visibility from parent Doc
         navHeaderId: navHeaderId || null,
         searchIndex,
-        publishedAt: status === 'published' ? new Date() : null,
+        publishedAt: status === "published" ? new Date() : null,
       } as any,
       include: {
         navHeader: {
@@ -248,17 +259,16 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        message: 'Page created successfully',
+        message: "Page created successfully",
         page,
       },
       { status: 201 }
     );
   } catch (error) {
-    console.error('API error:', error);
+    console.error("API error:", error);
     return NextResponse.json(
-      { error: 'Failed to create page' },
+      { error: "Failed to create page" },
       { status: 500 }
     );
   }
 }
-

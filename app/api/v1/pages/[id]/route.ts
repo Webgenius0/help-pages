@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-config';
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
 
 // Helper to verify API key
 async function verifyApiKey(apiKey: string) {
@@ -16,7 +16,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const apiKey = request.headers.get('x-api-key');
+    const apiKey = request.headers.get("x-api-key");
     const session = await getServerSession(authOptions);
 
     let user = null;
@@ -29,7 +29,7 @@ export async function GET(
       });
     }
 
-    const page = await prisma.page.findUnique({
+    const page = (await (prisma as any).page.findUnique({
       where: { id },
       include: {
         user: {
@@ -61,23 +61,28 @@ export async function GET(
             },
           },
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
           take: 10,
         },
       },
-    });
+    })) as any;
 
     if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
     // Check permissions - pages inherit visibility from parent Doc
     const isPublic = page.doc?.isPublic ?? false;
-    if (!isPublic && page.status === 'draft') {
-      if (!user || (user.id !== page.userId && user.role !== 'admin' && user.role !== 'editor')) {
+    if (!isPublic && page.status === "draft") {
+      if (
+        !user ||
+        (user.id !== page.userId &&
+          user.role !== "admin" &&
+          user.role !== "editor")
+      ) {
         return NextResponse.json(
-          { error: 'Unauthorized: Cannot access this page' },
+          { error: "Unauthorized: Cannot access this page" },
           { status: 403 }
         );
       }
@@ -85,9 +90,9 @@ export async function GET(
 
     return NextResponse.json({ page });
   } catch (error) {
-    console.error('API error:', error);
+    console.error("API error:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch page' },
+      { error: "Failed to fetch page" },
       { status: 500 }
     );
   }
@@ -100,7 +105,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params;
-    const apiKey = request.headers.get('x-api-key');
+    const apiKey = request.headers.get("x-api-key");
     const session = await getServerSession(authOptions);
 
     let user = null;
@@ -115,7 +120,7 @@ export async function PATCH(
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Unauthorized: Valid API key or session required' },
+        { error: "Unauthorized: Valid API key or session required" },
         { status: 401 }
       );
     }
@@ -125,13 +130,18 @@ export async function PATCH(
     });
 
     if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
     // Check permissions
-    if (user.role === 'viewer' || (user.id !== page.userId && user.role !== 'admin' && user.role !== 'editor')) {
+    if (
+      user.role === "viewer" ||
+      (user.id !== page.userId &&
+        user.role !== "admin" &&
+        user.role !== "editor")
+    ) {
       return NextResponse.json(
-        { error: 'Forbidden: Cannot edit this page' },
+        { error: "Forbidden: Cannot edit this page" },
         { status: 403 }
       );
     }
@@ -141,7 +151,9 @@ export async function PATCH(
 
     // Remove isPublic from body if present (Pages don't have isPublic - it's inherited from Doc)
     if (_isPublic !== undefined) {
-      console.warn('Ignoring isPublic field in request - Pages inherit visibility from their parent Doc');
+      console.warn(
+        "Ignoring isPublic field in request - Pages inherit visibility from their parent Doc"
+      );
     }
 
     const updateData: any = {
@@ -153,7 +165,7 @@ export async function PATCH(
     if (summary !== undefined) updateData.summary = summary;
     if (status) {
       updateData.status = status;
-      if (status === 'published' && !page.publishedAt) {
+      if (status === "published" && !page.publishedAt) {
         updateData.publishedAt = new Date();
       }
     }
@@ -163,7 +175,9 @@ export async function PATCH(
       const searchTitle = title || page.title;
       const searchContent = content || page.content;
       const searchSummary = summary !== undefined ? summary : page.summary;
-      updateData.searchIndex = `${searchTitle} ${searchContent} ${searchSummary || ''}`.toLowerCase();
+      updateData.searchIndex = `${searchTitle} ${searchContent} ${
+        searchSummary || ""
+      }`.toLowerCase();
     }
 
     // Create a revision before updating
@@ -195,13 +209,13 @@ export async function PATCH(
     });
 
     return NextResponse.json({
-      message: 'Page updated successfully',
+      message: "Page updated successfully",
       page: updatedPage,
     });
   } catch (error) {
-    console.error('API error:', error);
+    console.error("API error:", error);
     return NextResponse.json(
-      { error: 'Failed to update page' },
+      { error: "Failed to update page" },
       { status: 500 }
     );
   }
@@ -214,7 +228,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const apiKey = request.headers.get('x-api-key');
+    const apiKey = request.headers.get("x-api-key");
     const session = await getServerSession(authOptions);
 
     let user = null;
@@ -229,7 +243,7 @@ export async function DELETE(
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Unauthorized: Valid API key or session required' },
+        { error: "Unauthorized: Valid API key or session required" },
         { status: 401 }
       );
     }
@@ -239,13 +253,13 @@ export async function DELETE(
     });
 
     if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
     // Only admins can delete pages
-    if (user.role !== 'admin') {
+    if (user.role !== "admin") {
       return NextResponse.json(
-        { error: 'Forbidden: Only admins can delete pages' },
+        { error: "Forbidden: Only admins can delete pages" },
         { status: 403 }
       );
     }
@@ -255,14 +269,13 @@ export async function DELETE(
     });
 
     return NextResponse.json({
-      message: 'Page deleted successfully',
+      message: "Page deleted successfully",
     });
   } catch (error) {
-    console.error('API error:', error);
+    console.error("API error:", error);
     return NextResponse.json(
-      { error: 'Failed to delete page' },
+      { error: "Failed to delete page" },
       { status: 500 }
     );
   }
 }
-

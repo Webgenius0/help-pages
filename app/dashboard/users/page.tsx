@@ -1,25 +1,26 @@
-import { redirect } from 'next/navigation'
-import { getUser, getProfile } from '@/lib/auth'
-import UsersManagementClient from './UsersManagementClient'
+import { redirect } from "next/navigation";
+import { getUser, getProfile } from "@/lib/auth";
+import UsersManagementClient from "./UsersManagementClient";
+
+export const dynamic = "force-dynamic";
 
 export default async function UsersManagementPage() {
-  const user = await getUser()
-  
+  const user = await getUser();
+
   if (!user) {
-    redirect('/auth/login')
+    redirect("/auth/login");
   }
 
-  const profile = await getProfile()
+  const profile = await getProfile();
 
   if (!profile) {
-    redirect('/auth/login')
+    redirect("/auth/login");
   }
 
   // Only admins can access user management
-  if (profile.role !== 'admin') {
-    redirect('/dashboard')
+  if (profile.role !== "admin") {
+    redirect("/dashboard");
   }
 
-  return <UsersManagementClient />
+  return <UsersManagementClient />;
 }
-

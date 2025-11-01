@@ -1,18 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-config';
-import prisma from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
+import prisma from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const searchParams = request.nextUrl.searchParams;
-    const query = searchParams.get('q');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const includePrivate = searchParams.get('includePrivate') === 'true';
+    const query = searchParams.get("q");
+    const limit = parseInt(searchParams.get("limit") || "20");
+    const includePrivate = searchParams.get("includePrivate") === "true";
 
     if (!query || query.trim().length === 0) {
-      return NextResponse.json({ results: [], query: '' });
+      return NextResponse.json({ results: [], query: "" });
     }
 
     // Log the search query for analytics
@@ -36,17 +36,17 @@ export async function GET(request: NextRequest) {
     // Build the where clause based on permissions
     const whereClause: any = {
       OR: [
-        { title: { contains: query, mode: 'insensitive' } },
-        { content: { contains: query, mode: 'insensitive' } },
-        { summary: { contains: query, mode: 'insensitive' } },
-        { searchIndex: { contains: query, mode: 'insensitive' } },
+        { title: { contains: query, mode: "insensitive" } },
+        { content: { contains: query, mode: "insensitive" } },
+        { summary: { contains: query, mode: "insensitive" } },
+        { searchIndex: { contains: query, mode: "insensitive" } },
       ],
     };
 
     // If user is not logged in or doesn't want private pages, only show public pages
     // Pages inherit visibility from their parent Doc
     if (!session?.user || !includePrivate) {
-      whereClause.status = 'published';
+      whereClause.status = "published";
       whereClause.doc = {
         isPublic: true,
       };
@@ -58,13 +58,13 @@ export async function GET(request: NextRequest) {
 
       if (user) {
         whereClause.OR.push(
-          { status: 'published' },
-          { AND: [{ userId: user.id }, { status: 'draft' }] }
+          { status: "published" },
+          { AND: [{ userId: user.id }, { status: "draft" }] }
         );
       }
     }
 
-    const pages = await prisma.page.findMany({
+    const pages = (await (prisma as any).page.findMany({
       where: whereClause,
       select: {
         id: true,
@@ -95,15 +95,35 @@ export async function GET(request: NextRequest) {
       },
       take: limit,
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
-    });
+    })) as Array<{
+      id: string;
+      title: string;
+      slug: string;
+      summary: string | null;
+      content: string;
+      status: string;
+      updatedAt: Date;
+      docId: string | null;
+      doc: {
+        isPublic: boolean;
+      } | null;
+      user: {
+        username: string;
+        fullName: string | null;
+      };
+      navHeader: {
+        label: string;
+        slug: string;
+      } | null;
+    }>;
 
     const navHeaders = await prisma.navHeader.findMany({
       where: {
         OR: [
-          { label: { contains: query, mode: 'insensitive' } },
-          { slug: { contains: query, mode: 'insensitive' } },
+          { label: { contains: query, mode: "insensitive" } },
+          { slug: { contains: query, mode: "insensitive" } },
         ],
       },
       select: {
@@ -123,11 +143,7 @@ export async function GET(request: NextRequest) {
 
     // Create highlighted excerpts
     const results = pages.map((page) => {
-      const contentPreview = getHighlightedExcerpt(
-        page.content,
-        query,
-        150
-      );
+      const contentPreview = getHighlightedExcerpt(page.content, query, 150);
       const summaryPreview = page.summary
         ? getHighlightedExcerpt(page.summary, query, 100)
         : null;
@@ -137,12 +153,12 @@ export async function GET(request: NextRequest) {
         title: highlightText(page.title, query),
         slug: page.slug,
         summary: summaryPreview || contentPreview,
-        type: 'page',
+        type: "page",
         isPublic: page.doc?.isPublic ?? false, // Pages inherit visibility from parent Doc
         status: page.status,
         updatedAt: page.updatedAt,
         author: page.user.fullName || page.user.username,
-        category: page.navHeader?.label || 'Uncategorized',
+        category: page.navHeader?.label || "Uncategorized",
         url: `/u/${page.user.username}/${page.slug}`,
       };
     });
@@ -151,7 +167,7 @@ export async function GET(request: NextRequest) {
       id: header.id,
       title: highlightText(header.label, query),
       slug: header.slug,
-      type: 'category',
+      type: "category",
       parent: header.parent?.label,
       url: `/dashboard/pages?header=${header.id}`,
     }));
@@ -162,9 +178,9 @@ export async function GET(request: NextRequest) {
       totalCount: headerResults.length + results.length,
     });
   } catch (error) {
-    console.error('Search error:', error);
+    console.error("Search error:", error);
     return NextResponse.json(
-      { error: 'Failed to perform search' },
+      { error: "Failed to perform search" },
       { status: 500 }
     );
   }
@@ -174,8 +190,8 @@ export async function GET(request: NextRequest) {
 function highlightText(text: string, query: string): string {
   if (!text || !query) return text;
 
-  const regex = new RegExp(`(${escapeRegExp(query)})`, 'gi');
-  return text.replace(regex, '<mark>$1</mark>');
+  const regex = new RegExp(`(${escapeRegExp(query)})`, "gi");
+  return text.replace(regex, "<mark>$1</mark>");
 }
 
 // Helper function to get an excerpt with highlighted query
@@ -184,7 +200,7 @@ function getHighlightedExcerpt(
   query: string,
   maxLength: number
 ): string {
-  if (!content) return '';
+  if (!content) return "";
 
   const lowerContent = content.toLowerCase();
   const lowerQuery = query.toLowerCase();
@@ -193,7 +209,7 @@ function getHighlightedExcerpt(
   if (index === -1) {
     // Query not found, return beginning
     const excerpt = content.substring(0, maxLength);
-    return excerpt.length < content.length ? excerpt + '...' : excerpt;
+    return excerpt.length < content.length ? excerpt + "..." : excerpt;
   }
 
   // Extract context around the match
@@ -202,14 +218,13 @@ function getHighlightedExcerpt(
 
   let excerpt = content.substring(start, end);
 
-  if (start > 0) excerpt = '...' + excerpt;
-  if (end < content.length) excerpt = excerpt + '...';
+  if (start > 0) excerpt = "..." + excerpt;
+  if (end < content.length) excerpt = excerpt + "...";
 
   return highlightText(excerpt, query);
 }
 
 // Escape special regex characters
 function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-

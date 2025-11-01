@@ -1,24 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-config';
-import prisma from '@/lib/prisma';
+import { NextRequest, NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-config";
+import prisma from "@/lib/prisma";
 
 // GET /api/export?format=markdown|html|pdf&pageId=...
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     const searchParams = request.nextUrl.searchParams;
-    const format = searchParams.get('format') || 'markdown';
-    const pageId = searchParams.get('pageId');
+    const format = searchParams.get("format") || "markdown";
+    const pageId = searchParams.get("pageId");
 
     if (!pageId) {
       return NextResponse.json(
-        { error: 'Missing pageId parameter' },
+        { error: "Missing pageId parameter" },
         { status: 400 }
       );
     }
 
-    const page = await prisma.page.findUnique({
+    const page = (await (prisma as any).page.findUnique({
       where: { id: pageId },
       include: {
         user: {
@@ -40,20 +40,17 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-    });
+    })) as any;
 
     if (!page) {
-      return NextResponse.json({ error: 'Page not found' }, { status: 404 });
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
     // Check permissions - Pages inherit visibility from their parent Doc
     // Only allow export of published pages, or drafts if user owns the page/doc
-    if (page.status === 'draft') {
+    if (page.status === "draft") {
       if (!session?.user?.email) {
-        return NextResponse.json(
-          { error: 'Unauthorized' },
-          { status: 401 }
-        );
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
 
       const user = await prisma.user.findUnique({
@@ -62,23 +59,22 @@ export async function GET(request: NextRequest) {
 
       // Check if user owns the page or the doc that contains it
       let canExport = false;
-      if (user && (user.id === page.userId || user.role === 'admin' || user.role === 'editor')) {
+      if (
+        user &&
+        (user.id === page.userId ||
+          user.role === "admin" ||
+          user.role === "editor")
+      ) {
         canExport = true;
-      } else if (page.docId) {
-        const doc = await prisma.doc.findUnique({
-          where: { id: page.docId },
-          select: { userId: true },
-        });
-        if (doc && user && doc.userId === user.id) {
+      } else if (page.doc?.id) {
+        // Use doc relation that was already fetched
+        if (page.doc && user && page.doc.userId === user.id) {
           canExport = true;
         }
       }
 
       if (!canExport) {
-        return NextResponse.json(
-          { error: 'Forbidden' },
-          { status: 403 }
-        );
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
 
@@ -87,41 +83,44 @@ export async function GET(request: NextRequest) {
     let filename: string;
 
     switch (format) {
-      case 'markdown':
+      case "markdown":
         content = exportAsMarkdown(page);
-        contentType = 'text/markdown';
+        contentType = "text/markdown";
         filename = `${page.slug}.md`;
         break;
 
-      case 'html':
+      case "html":
         content = exportAsHTML(page);
-        contentType = 'text/html';
+        contentType = "text/html";
         filename = `${page.slug}.html`;
         break;
 
-      case 'pdf':
+      case "pdf":
         return NextResponse.json(
-          { error: 'PDF export not yet implemented. Please use HTML export and print to PDF.' },
+          {
+            error:
+              "PDF export not yet implemented. Please use HTML export and print to PDF.",
+          },
           { status: 501 }
         );
 
       default:
         return NextResponse.json(
-          { error: 'Invalid format. Use: markdown, html, or pdf' },
+          { error: "Invalid format. Use: markdown, html, or pdf" },
           { status: 400 }
         );
     }
 
     return new NextResponse(content, {
       headers: {
-        'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        "Content-Type": contentType,
+        "Content-Disposition": `attachment; filename="${filename}"`,
       },
     });
   } catch (error) {
-    console.error('Export error:', error);
+    console.error("Export error:", error);
     return NextResponse.json(
-      { error: 'Failed to export page' },
+      { error: "Failed to export page" },
       { status: 500 }
     );
   }
@@ -129,7 +128,7 @@ export async function GET(request: NextRequest) {
 
 function exportAsMarkdown(page: any): string {
   const author = page.user.fullName || page.user.username;
-  const category = page.navHeader?.label || 'Uncategorized';
+  const category = page.navHeader?.label || "Uncategorized";
   const date = new Date(page.updatedAt).toLocaleDateString();
 
   return `---
@@ -142,7 +141,7 @@ status: ${page.status}
 
 # ${page.title}
 
-${page.summary ? `> ${page.summary}\n\n` : ''}
+${page.summary ? `> ${page.summary}\n\n` : ""}
 
 ${page.content}
 
@@ -156,19 +155,19 @@ ${page.content}
 
 function exportAsHTML(page: any): string {
   const author = page.user.fullName || page.user.username;
-  const category = page.navHeader?.label || 'Uncategorized';
+  const category = page.navHeader?.label || "Uncategorized";
   const date = new Date(page.updatedAt).toLocaleDateString();
 
   // Simple markdown to HTML conversion
   let htmlContent = page.content
-    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
-    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
-    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
-    .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
-    .replace(/\*(.*)\*/gim, '<em>$1</em>')
-    .replace(/\`(.*?)\`/gim, '<code>$1</code>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/\n/g, '<br>');
+    .replace(/^### (.*$)/gim, "<h3>$1</h3>")
+    .replace(/^## (.*$)/gim, "<h2>$1</h2>")
+    .replace(/^# (.*$)/gim, "<h1>$1</h1>")
+    .replace(/\*\*(.*)\*\*/gim, "<strong>$1</strong>")
+    .replace(/\*(.*)\*/gim, "<em>$1</em>")
+    .replace(/\`(.*?)\`/gim, "<code>$1</code>")
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br>");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -219,7 +218,7 @@ function exportAsHTML(page: any): string {
 <body>
   <h1>${page.title}</h1>
   
-  ${page.summary ? `<div class="summary">${page.summary}</div>` : ''}
+  ${page.summary ? `<div class="summary">${page.summary}</div>` : ""}
   
   <p>${htmlContent}</p>
   
@@ -232,4 +231,3 @@ function exportAsHTML(page: any): string {
 </body>
 </html>`;
 }
-

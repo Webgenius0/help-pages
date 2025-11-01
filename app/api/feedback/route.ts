@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     // Increment view count or update page stats if helpful
     if (helpful) {
-      await prisma.page.update({
+      await (prisma as any).page.update({
         where: { id: pageId },
         data: {
           viewCount: {
@@ -60,4 +60,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
