@@ -132,28 +132,38 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
       return;
     }
 
-    try {
-      const response = await fetch("/api/docs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...docForm,
-          slug: generateSlug(docForm.slug || docForm.title),
-        }),
-      });
+    const createDoc = async () => {
+      try {
+        setCreating(true);
+        // Allow React to re-render with loading state
+        await new Promise((resolve) => setTimeout(resolve, 50));
 
-      const data = await response.json();
+        const response = await fetch("/api/docs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...docForm,
+            slug: generateSlug(docForm.slug || docForm.title),
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create documentation");
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to create documentation");
+        }
+
+        // Redirect to doc editor
+        router.push(`/dashboard/docs/${data.doc.id}`);
+        router.refresh();
+      } catch (err: any) {
+        setError(err.message || "Failed to create documentation");
+        setCreating(false);
       }
+    };
 
-      // Redirect to doc editor
-      router.push(`/dashboard/docs/${data.doc.id}`);
-      router.refresh();
-    } catch (err: any) {
-      setError(err.message || "Failed to create documentation");
-    }
+    // Call async function immediately
+    createDoc();
   };
 
   const handleDeleteDoc = async (docId: string, title: string) => {
@@ -346,7 +356,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary"
+                    className="btn-primary flex items-center justify-center"
                     disabled={creating}
                   >
                     {creating ? (

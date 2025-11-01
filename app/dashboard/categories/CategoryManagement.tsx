@@ -48,6 +48,9 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
 
     try {
       setCreating(true);
+      // Allow React to re-render with loading state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       const response = await fetch('/api/nav-headers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

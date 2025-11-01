@@ -77,6 +77,9 @@ export default function UsersManagementClient() {
 
     try {
       setCreating(true);
+      // Allow React to re-render with loading state
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
       const response = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -355,7 +358,7 @@ export default function UsersManagementClient() {
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary"
+                    className="btn-primary flex items-center justify-center"
                     disabled={creating}
                   >
                     {creating ? (
