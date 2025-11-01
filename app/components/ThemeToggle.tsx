@@ -66,7 +66,7 @@ export function ThemeToggle() {
                       : "text-foreground"
                   }`}
                 >
-                  <span className="flex-shrink-0">{themeOption.icon}</span>
+                  <span className="shrink-0">{themeOption.icon}</span>
                   <span>{themeOption.label}</span>
                   {theme === themeOption.value && (
                     <span className="ml-auto text-primary">✓</span>
