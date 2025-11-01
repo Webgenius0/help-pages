@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   GripVertical,
+  Loader2,
 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
 
@@ -74,6 +75,8 @@ export function DocManagementClient({
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
   const [showNewSectionModal, setShowNewSectionModal] = useState(false);
   const [showNewPageModal, setShowNewPageModal] = useState(false);
+  const [creatingSection, setCreatingSection] = useState(false);
+  const [creatingPage, setCreatingPage] = useState(false);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(
     null
   );
@@ -159,6 +162,7 @@ export function DocManagementClient({
     }
 
     try {
+      setCreatingSection(true);
       const response = await fetch(
         `/api/nav-headers?docId=${encodeURIComponent(doc.id)}`,
         {
@@ -184,6 +188,8 @@ export function DocManagementClient({
       setSectionForm({ label: "", slug: "", parentId: null });
     } catch (err: any) {
       setError(err.message || "Failed to create section");
+    } finally {
+      setCreatingSection(false);
     }
   };
 
@@ -211,6 +217,7 @@ export function DocManagementClient({
     }
 
     try {
+      setCreatingPage(true);
       const response = await fetch("/api/pages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -236,6 +243,8 @@ export function DocManagementClient({
       router.push(`/dashboard/pages/${data.page.id}`);
     } catch (err: any) {
       setError(err.message || "Failed to create page");
+    } finally {
+      setCreatingPage(false);
     }
   };
 
@@ -525,11 +534,23 @@ export function DocManagementClient({
                       setError(null);
                     }}
                     className="btn-secondary"
+                    disabled={creatingSection}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary">
-                    Create Section
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={creatingSection}
+                  >
+                    {creatingSection ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Section"
+                    )}
                   </button>
                 </div>
               </form>
@@ -607,11 +628,23 @@ export function DocManagementClient({
                       setError(null);
                     }}
                     className="btn-secondary"
+                    disabled={creatingPage}
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary">
-                    Create Page
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={creatingPage}
+                  >
+                    {creatingPage ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Page"
+                    )}
                   </button>
                 </div>
               </form>

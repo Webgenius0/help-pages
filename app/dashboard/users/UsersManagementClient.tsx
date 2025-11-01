@@ -10,6 +10,7 @@ import {
   User as UserIcon,
   Shield,
   Eye,
+  Loader2,
 } from "lucide-react";
 
 interface User {
@@ -29,6 +30,7 @@ interface User {
 export default function UsersManagementClient() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -74,6 +76,7 @@ export default function UsersManagementClient() {
     setError(null);
 
     try {
+      setCreating(true);
       const response = await fetch("/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -99,6 +102,8 @@ export default function UsersManagementClient() {
       alert("User created successfully!");
     } catch (err: any) {
       setError(err.message || "Failed to create user");
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -348,8 +353,19 @@ export default function UsersManagementClient() {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary">
-                    Create User
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={creating}
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create User"
+                    )}
                   </button>
                 </div>
               </form>

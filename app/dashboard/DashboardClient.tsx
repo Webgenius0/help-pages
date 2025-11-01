@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Globe,
   Lock,
+  Loader2,
 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
 
@@ -53,6 +54,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
   const router = useRouter();
   const [docs, setDocs] = useState<Doc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [showNewDocModal, setShowNewDocModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -342,8 +344,19 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                   >
                     Cancel
                   </button>
-                  <button type="submit" className="btn-primary">
-                    Create Documentation
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={creating}
+                  >
+                    {creating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Documentation"
+                    )}
                   </button>
                 </div>
               </form>

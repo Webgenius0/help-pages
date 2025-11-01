@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Save, Upload, User, Lock, Mail } from "lucide-react";
+import { Save, Upload, User, Lock, Mail, Loader2 } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -277,7 +277,11 @@ export default function SettingsClient({
                     disabled={saving}
                     className="btn-primary flex items-center space-x-2"
                   >
-                    <Save className="w-4 h-4" />
+                    {saving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
                     <span>{saving ? "Saving..." : "Save Profile"}</span>
                   </button>
                 </div>
@@ -351,7 +355,11 @@ export default function SettingsClient({
                     }
                     className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Lock className="w-4 h-4" />
+                    {changingPassword ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Lock className="w-4 h-4" />
+                    )}
                     <span>
                       {changingPassword ? "Changing..." : "Change Password"}
                     </span>
