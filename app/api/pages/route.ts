@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { navHeaderId, parentId, title, slug, content, summary, position, docId } = body
+    const { navHeaderId, parentId, title, slug, content, summary, position, docId, docItemId } = body
 
     if (!title || !docId) {
       return NextResponse.json({ error: 'Title and docId are required' }, { status: 400 })
@@ -54,10 +54,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Check for duplicate slug within the doc
+    // Check for duplicate slug within the doc/docItem
     const existingPage = await prisma.page.findFirst({
       where: {
         docId: docId,
+        docItemId: docItemId || null,
         slug: normalizedSlug,
       },
     })
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
     const page = await prisma.page.create({
       data: {
         docId: docId,
+        docItemId: docItemId || null,
         userId: profile.id,
         navHeaderId: navHeaderId || null,
         parentId: parentId || null,

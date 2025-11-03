@@ -23,70 +23,16 @@ export default async function DocManagementPage({
     redirect("/auth/login");
   }
 
-  // Fetch the doc (include userId for permission checks)
+  // Fetch the doc (just basic info - DocManagementClient will load the full structure)
   const doc = await (prisma as any).doc.findUnique({
     where: { id },
-    include: {
-      navHeaders: {
-        where: {
-          parentId: null, // Top-level sections only
-        },
-        include: {
-          children: {
-            include: {
-              pages: {
-                orderBy: {
-                  position: "asc",
-                },
-                select: {
-                  id: true,
-                  title: true,
-                  slug: true,
-                  status: true,
-                  position: true,
-                },
-              },
-            },
-            orderBy: {
-              position: "asc",
-            },
-          },
-          pages: {
-            where: {
-              parentId: null,
-            },
-            orderBy: {
-              position: "asc",
-            },
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-              status: true,
-              position: true,
-            },
-          },
-        },
-        orderBy: {
-          position: "asc",
-        },
-      },
-      pages: {
-        where: {
-          parentId: null,
-          navHeaderId: null, // Pages not in any section
-        },
-        orderBy: {
-          position: "asc",
-        },
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          status: true,
-          position: true,
-        },
-      },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      description: true,
+      isPublic: true,
+      userId: true,
       _count: {
         select: {
           pages: true,
@@ -108,5 +54,13 @@ export default async function DocManagementPage({
     redirect("/dashboard");
   }
 
-  return <DocManagementClient doc={doc} profile={profile} />;
+  // Prepare doc with empty arrays for navHeaders and pages
+  // DocManagementClient will load them via API calls
+  const docWithEmptyArrays = {
+    ...doc,
+    navHeaders: [],
+    pages: [],
+  };
+
+  return <DocManagementClient doc={docWithEmptyArrays} profile={profile} />;
 }

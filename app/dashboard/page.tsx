@@ -19,7 +19,13 @@ export default async function DashboardPage() {
     console.error("Dashboard page error:", error);
 
     // If it's a database/Prisma error, show migration message
-    if (error?.message?.includes("does not exist") || error?.code === "P2021") {
+    if (
+      error?.message?.includes("does not exist") ||
+      error?.code === "P2021" ||
+      error?.code === "P2009" || // Prisma validation error
+      error?.message?.includes("Unknown argument") || // Prisma field doesn't exist (needs regenerate)
+      error?.message?.includes("docItemId")
+    ) {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-card border border-border rounded-lg p-6">
@@ -43,7 +49,7 @@ export default async function DashboardPage() {
                 </li>
                 <li>
                   <code className="bg-background px-2 py-1 rounded">
-                    npx prisma migrate dev --name add_doc_model
+                    npx prisma migrate dev --name add_doc_items
                   </code>
                 </li>
                 <li>Restart your dev server</li>
