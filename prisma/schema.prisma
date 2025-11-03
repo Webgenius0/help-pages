@@ -85,7 +85,7 @@ model Doc {
 
   user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   pages      Page[]
-  navHeaders NavHeader[]
+  navHeaders NavHeader[] // Top-level header dropdowns (e.g., "Products", "Build", "Manage")
 
   @@unique([userId, slug])
   @@index([userId])
@@ -94,24 +94,52 @@ model Doc {
   @@map("docs")
 }
 
+// DocItem = Items within a NavHeader dropdown (e.g., "Database", "Auth", "Storage" under "Products")
+// NavHeader = Header dropdowns (e.g., "Products", "Build", "Manage", "Reference", "Resources")
+model DocItem {
+  id          String   @id @default(cuid())
+  navHeaderId String   @map("nav_header_id") // Belongs to a NavHeader (header dropdown)
+  label       String   // Display name (e.g., "Database", "Auth", "Storage")
+  slug        String   // URL-friendly identifier
+  description String?  @db.Text
+  position    Int      @default(0)
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  navHeader   NavHeader   @relation("DropdownItems", fields: [navHeaderId], references: [id], onDelete: Cascade)
+  pages       Page[]
+  sections    NavHeader[] @relation("ItemSections") // Sections/subsections within this item
+
+  @@unique([navHeaderId, slug])
+  @@index([navHeaderId])
+  @@index([position])
+  @@map("doc_items")
+}
+
 model NavHeader {
-  id        String   @id @default(cuid())
-  docId     String?  @map("doc_id") // Sections belong to a Doc (nullable for migration)
-  parentId  String?  @map("parent_id") // For subsections
-  label     String
-  slug      String
-  position  Int      @default(0)
-  icon      String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String    @id @default(cuid())
+  docId      String    @map("doc_id") // Top-level header dropdowns belong to a Doc (required)
+  docItemId  String?   @map("doc_item_id") // Optional: sections/subsections belong to a DocItem
+  parentId   String?   @map("parent_id") // For subsections within a DocItem
+  label      String    // Display name (e.g., "Products" for dropdown, or "Getting Started" for section)
+  slug       String
+  position   Int       @default(0)
+  icon       String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  doc      Doc?        @relation(fields: [docId], references: [id], onDelete: Cascade)
-  parent   NavHeader?  @relation("HeaderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children NavHeader[] @relation("HeaderHierarchy")
-  pages    Page[]
+  doc         Doc        @relation(fields: [docId], references: [id], onDelete: Cascade)
+  docItem     DocItem?   @relation("ItemSections", fields: [docItemId], references: [id], onDelete: Cascade)
+  parent      NavHeader? @relation("HeaderHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children    NavHeader[] @relation("HeaderHierarchy")
+  docItems    DocItem[]  @relation("DropdownItems") // Items within this dropdown (if this is a top-level dropdown, parentId is null)
+  pages       Page[]
 
-  @@unique([docId, parentId, slug])
+  @@unique([docId, parentId, slug]) // Unique for top-level dropdowns (parentId is null)
+  @@unique([docId, docItemId, parentId, slug]) // Unique for sections within DocItems
   @@index([docId])
+  @@index([docItemId])
   @@index([parentId])
   @@index([position])
   @@map("nav_headers")
@@ -119,9 +147,10 @@ model NavHeader {
 
 model Page {
   id              String    @id @default(cuid())
-  docId           String?   @map("doc_id") // Page belongs to a Doc (nullable for migration)
+  docId           String    @map("doc_id") // Page belongs to a Doc (required)
+  docItemId       String?   @map("doc_item_id") // Belongs to a DocItem (item within a dropdown, required when creating pages)
   userId          String    @map("user_id") // Creator/owner
-  navHeaderId     String?   @map("nav_header_id") // Section (optional)
+  navHeaderId     String?   @map("nav_header_id") // Optional: Section within a DocItem
   parentId        String?   @map("parent_id") // For nested pages
   title           String
   slug            String
@@ -141,15 +170,17 @@ model Page {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  doc       Doc?           @relation(fields: [docId], references: [id], onDelete: Cascade)
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  navHeader NavHeader?     @relation(fields: [navHeaderId], references: [id], onDelete: SetNull)
-  parent    Page?          @relation("PageHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
-  children  Page[]         @relation("PageHierarchy")
+  doc       Doc           @relation(fields: [docId], references: [id], onDelete: Cascade)
+  docItem   DocItem?      @relation(fields: [docItemId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  navHeader NavHeader?    @relation(fields: [navHeaderId], references: [id], onDelete: SetNull)
+  parent    Page?         @relation("PageHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Page[]        @relation("PageHierarchy")
   revisions PageRevision[]
 
-  @@unique([docId, slug]) // Unique slug per doc
+  @@unique([docId, docItemId, slug]) // Unique slug per doc/docItem combination
   @@index([docId])
+  @@index([docItemId])
   @@index([userId])
   @@index([navHeaderId])
   @@index([parentId])

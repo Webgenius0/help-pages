@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams;
     const docId = searchParams.get("docId");
+    const docItemId = searchParams.get("docItemId");
 
     if (!docId) {
       return NextResponse.json({ error: "docId is required" }, { status: 400 });
@@ -40,37 +41,116 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Get all top-level headers with their children and pages
-    const headers = await prisma.navHeader.findMany({
+    // If docItemId is provided, fetch sections within that DocItem
+    if (docItemId) {
+      const headers = await (prisma as any).navHeader.findMany({
+        where: {
+          docId: docId as any,
+          docItemId: docItemId as any,
+          parentId: null, // Top-level sections within the DocItem
+        } as any,
+        include: {
+          pages: {
+            where: { parentId: null },
+            select: { id: true, title: true, slug: true, status: true, position: true },
+            orderBy: { position: "asc" },
+          },
+          children: {
+            include: {
+              pages: {
+                where: { parentId: null },
+                select: { id: true, title: true, slug: true, status: true, position: true },
+                orderBy: { position: "asc" },
+              },
+            },
+            orderBy: { position: "asc" },
+          },
+        },
+        orderBy: { position: "asc" },
+      });
+      return NextResponse.json({ headers });
+    }
+
+    // Get all top-level header dropdowns (parentId is null, docItemId is null)
+    // These are the main dropdowns like "Products", "Build", "Manage"
+    const headers = await (prisma as any).navHeader.findMany({
       where: {
         docId: docId as any,
-        parentId: null, // Only top-level headers
+        parentId: null, // Only top-level dropdowns
+        docItemId: null, // Not sections within DocItems
       } as any,
-      include: {
-        children: {
-          include: {
-            pages: {
-              where: { parentId: null },
-              select: { id: true, title: true, slug: true, status: true },
-              orderBy: { position: "asc" },
-            },
-          },
-          orderBy: { position: "asc" },
-        },
-        pages: {
-          where: { parentId: null },
-          select: { id: true, title: true, slug: true, status: true },
-          orderBy: { position: "asc" },
-        },
-      },
       orderBy: { position: "asc" },
     });
 
-    return NextResponse.json({ headers });
-  } catch (error) {
+    // Manually fetch docItems for each header and add counts
+    // Using $queryRaw to work around Prisma Client not being regenerated yet
+    const headersWithItems = await Promise.all(
+      headers.map(async (header: any) => {
+        try {
+          // Use raw SQL query since Prisma Client hasn't been regenerated
+          const docItems = await (prisma as any).$queryRaw`
+            SELECT 
+              id,
+              nav_header_id as "navHeaderId",
+              label,
+              slug,
+              description,
+              position,
+              is_default as "isDefault",
+              created_at as "createdAt",
+              updated_at as "updatedAt"
+            FROM doc_items
+            WHERE nav_header_id = ${header.id}
+            ORDER BY position ASC
+          `;
+
+          // For each docItem, get page count and section count
+          const itemsWithCounts = await Promise.all(
+            docItems.map(async (item: any) => {
+              const pagesCount = await (prisma as any).page.count({
+                where: {
+                  docItemId: item.id,
+                } as any,
+              });
+              const sectionsCount = await (prisma as any).navHeader.count({
+                where: {
+                  docItemId: item.id,
+                } as any,
+              });
+              return {
+                ...item,
+                _count: {
+                  pages: pagesCount,
+                  sections: sectionsCount,
+                },
+              };
+            })
+          );
+
+          return {
+            ...header,
+            docItems: itemsWithCounts,
+          };
+        } catch (error: any) {
+          console.error(`Error fetching docItems for header ${header.id}:`, error);
+          // Return header with empty docItems on error
+          return {
+            ...header,
+            docItems: [],
+          };
+        }
+      })
+    );
+
+    return NextResponse.json({ headers: headersWithItems });
+  } catch (error: any) {
     console.error("Error fetching headers:", error);
+    console.error("Error details:", error?.message, error?.stack);
     return NextResponse.json(
-      { error: "Failed to fetch headers" },
+      { 
+        error: "Failed to fetch headers",
+        details: error?.message || "Unknown error"
+      },
       { status: 500 }
     );
   }
@@ -93,7 +173,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { label, slug, parentId, icon, position, docId } = body;
+    const { label, slug, parentId, icon, position, docId, docItemId } = body;
 
     if (!label || !docId) {
       return NextResponse.json(
@@ -129,9 +209,10 @@ export async function POST(request: NextRequest) {
     const header = await prisma.navHeader.create({
       data: {
         docId: docId as any,
+        docItemId: docItemId || null, // Set if creating a section within a DocItem
         label,
         slug: normalizedSlug,
-        parentId: parentId || null,
+        parentId: parentId || null, // Set if creating a subsection
         icon: icon || null,
         position: position || 0,
       } as any,

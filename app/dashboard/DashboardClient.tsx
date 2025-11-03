@@ -66,6 +66,16 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
     isPublic: true,
   });
 
+  // Prevent redirects to invalid routes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const pathname = window.location.pathname;
+      if (pathname.includes("/dashboard/all-courses")) {
+        router.replace("/dashboard");
+      }
+    }
+  }, [router]);
+
   useEffect(() => {
     loadDocs();
   }, []);
