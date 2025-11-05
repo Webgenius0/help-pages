@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -97,12 +97,69 @@ function PublicDocsViewContent({
   );
 
   // Track expanded sections and subsections
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set()
+  // Use sessionStorage to persist expanded state across navigation
+  const getStoredExpandedSections = (): Set<string> => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = sessionStorage.getItem(`expandedSections_${doc.slug}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return new Set(parsed);
+      }
+    } catch (e) {
+      console.error("Error loading expanded sections:", e);
+    }
+    return new Set();
+  };
+
+  const getStoredExpandedSubsections = (): Set<string> => {
+    if (typeof window === "undefined") return new Set();
+    try {
+      const stored = sessionStorage.getItem(`expandedSubsections_${doc.slug}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return new Set(parsed);
+      }
+    } catch (e) {
+      console.error("Error loading expanded subsections:", e);
+    }
+    return new Set();
+  };
+
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() =>
+    getStoredExpandedSections()
   );
   const [expandedSubsections, setExpandedSubsections] = useState<Set<string>>(
-    new Set()
+    () => getStoredExpandedSubsections()
   );
+
+  // Save expanded sections to sessionStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(
+          `expandedSections_${doc.slug}`,
+          JSON.stringify(Array.from(expandedSections))
+        );
+      } catch (e) {
+        console.error("Error saving expanded sections:", e);
+      }
+    }
+  }, [expandedSections, doc.slug]);
+
+  // Save expanded subsections to sessionStorage whenever they change
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem(
+          `expandedSubsections_${doc.slug}`,
+          JSON.stringify(Array.from(expandedSubsections))
+        );
+      } catch (e) {
+        console.error("Error saving expanded subsections:", e);
+      }
+    }
+  }, [expandedSubsections, doc.slug]);
 
   // Mobile sidebar state
   const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);

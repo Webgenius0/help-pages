@@ -236,6 +236,13 @@ export function DocTopbar({
         setIsSearchFocused(false);
       }
 
+      // Don't close dropdown if clicking on a link (navigation)
+      // This allows the dropdown to stay open when navigating
+      const clickedLink = (target as Element).closest("a");
+      if (clickedLink) {
+        return; // Don't close dropdown when clicking links
+      }
+
       // Check if click is outside any navigation dropdown
       let clickedOutside = true;
       Object.values(dropdownRefs.current).forEach((ref) => {
