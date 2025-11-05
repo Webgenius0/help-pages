@@ -45,17 +45,61 @@ async function main() {
     },
   });
 
-  const editor = await prisma.user.create({
-    data: {
-      email: 'editor@example.com',
-      username: 'editor',
-      password: hashedPassword,
-      fullName: 'Editor User',
-      role: 'editor',
-      isPublic: true,
-      bio: 'Content editor',
-    },
-  });
+  // Create editor with createdBy set to admin (if column exists)
+  let editor: any;
+  try {
+    editor = await prisma.user.create({
+      data: {
+        email: 'editor@example.com',
+        username: 'editor',
+        password: hashedPassword,
+        fullName: 'Editor User',
+        role: 'editor',
+        isPublic: true,
+        bio: 'Content editor',
+        createdBy: admin.id, // Editor created by admin
+      } as any,
+    });
+  } catch (error: any) {
+    // If createdBy column doesn't exist yet, create without it
+    if (
+      error.message?.includes("created_by") ||
+      error.message?.includes("does not exist")
+    ) {
+      // Check if column exists first
+      const columnExists = await (prisma as any).$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'created_by'
+      `;
+
+      if (columnExists.length === 0) {
+        // Column doesn't exist yet - create without createdBy
+        editor = await prisma.user.create({
+          data: {
+            email: 'editor@example.com',
+            username: 'editor',
+            password: hashedPassword,
+            fullName: 'Editor User',
+            role: 'editor',
+            isPublic: true,
+            bio: 'Content editor',
+          },
+        });
+      } else {
+        // Column exists but Prisma client hasn't been regenerated - use raw SQL
+        const result = await (prisma as any).$queryRaw`
+          INSERT INTO users (email, username, password, full_name, role, is_public, bio, created_by, created_at, updated_at)
+          VALUES (${'editor@example.com'}, ${'editor'}, ${hashedPassword}, ${'Editor User'}, ${'editor'}, true, ${'Content editor'}, ${admin.id}, NOW(), NOW())
+          RETURNING id, email, username, full_name as "fullName", role, is_public as "isPublic", bio, created_at as "createdAt"
+        `;
+        editor = result[0];
+      }
+    } else {
+      // Re-throw other errors
+      throw error;
+    }
+  }
 
   console.log(`✅ Created users: ${admin.username}, ${editor.username}\n`);
 

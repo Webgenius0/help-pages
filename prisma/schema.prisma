@@ -20,6 +20,7 @@ model User {
   bio       String?  @db.Text
   role      String   @default("viewer") // 'admin' | 'editor' | 'viewer'
   isPublic  Boolean  @default(true) @map("is_public")
+  createdBy String?  @map("created_by") // ID of the admin who created this user
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -29,6 +30,7 @@ model User {
   sessions      Session[]
   pageRevisions PageRevision[]
 
+  @@index([createdBy])
   @@map("users")
 }
 
