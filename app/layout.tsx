@@ -3,8 +3,6 @@ import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Providers } from "./providers";
-import { Header } from "./components/Header";
-import { Sidebar } from "./components/Sidebar";
 
 const metadata: Metadata = {
   applicationName: "HelpPages",

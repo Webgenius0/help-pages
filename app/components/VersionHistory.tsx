@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { Clock, User, RotateCcw, X } from "lucide-react";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
+import toast from "react-hot-toast";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 
 interface PageRevision {
   id: string;
@@ -29,6 +32,23 @@ export function VersionHistory({ pageId, onRestore }: VersionHistoryProps) {
   const [loading, setLoading] = useState(true);
   const [selectedRevision, setSelectedRevision] = useState<PageRevision | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger";
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    variant: "default",
+    isLoading: false,
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -52,10 +72,25 @@ export function VersionHistory({ pageId, onRestore }: VersionHistoryProps) {
   };
 
   const handleRestore = async (revisionId: string) => {
-    if (confirm("Are you sure you want to restore this version? This will create a new revision with the restored content.")) {
-      await onRestore(revisionId);
-      setIsOpen(false);
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Restore Version",
+      message: "Are you sure you want to restore this version? This will create a new revision with the restored content.",
+      variant: "default",
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          await onRestore(revisionId);
+          toast.success("Version restored successfully!");
+          setIsOpen(false);
+          setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+        } catch (error) {
+          toast.error("Failed to restore version");
+          setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+        }
+      },
+    });
   };
 
   return (
@@ -87,8 +122,8 @@ export function VersionHistory({ pageId, onRestore }: VersionHistoryProps) {
               {/* Revisions List */}
               <div className="w-1/3 border-r border-border overflow-y-auto">
                 {loading ? (
-                  <div className="p-6 text-center text-muted-foreground">
-                    Loading...
+                  <div className="p-6 flex items-center justify-center">
+                    <LoadingSpinner size="md" text="Loading revisions..." />
                   </div>
                 ) : revisions.length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground">
@@ -181,6 +216,17 @@ export function VersionHistory({ pageId, onRestore }: VersionHistoryProps) {
           </div>
         </div>
       )}
+      
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        isLoading={confirmModal.isLoading}
+      />
     </>
   );
 }

@@ -3,8 +3,17 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { BookOpen, FileText, ChevronRight } from "lucide-react";
+import {
+  BookOpen,
+  FileText,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Menu,
+  X,
+} from "lucide-react";
 import { DocTopbar } from "./DocTopbar";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 
 interface Page {
   id: string;
@@ -36,6 +45,7 @@ interface DocItem {
   label: string;
   slug: string;
   isDefault: boolean;
+  description?: string | null;
   pages?: Page[];
   sections?: Section[];
 }
@@ -86,6 +96,42 @@ function PublicDocsViewContent({
     }
   );
 
+  // Track expanded sections and subsections
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set()
+  );
+  const [expandedSubsections, setExpandedSubsections] = useState<Set<string>>(
+    new Set()
+  );
+
+  // Mobile sidebar state
+  const [isLeftSidebarOpen, setIsLeftSidebarOpen] = useState(false);
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false);
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSubsection = (subsectionId: string) => {
+    setExpandedSubsections((prev) => {
+      const next = new Set(prev);
+      if (next.has(subsectionId)) {
+        next.delete(subsectionId);
+      } else {
+        next.add(subsectionId);
+      }
+      return next;
+    });
+  };
+
   // Get selected item with its pages and sections
   const selectedItem = selectedDocItemId
     ? allItems.find((item) => item.id === selectedDocItemId)
@@ -122,14 +168,42 @@ function PublicDocsViewContent({
         allItems={allItems}
       />
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Mobile Overlay */}
+        {(isLeftSidebarOpen || isRightSidebarOpen) && (
+          <div
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => {
+              setIsLeftSidebarOpen(false);
+              setIsRightSidebarOpen(false);
+            }}
+          />
+        )}
+
         {/* Left Sidebar - Pages Navigation */}
-        <aside className="w-64 border-r border-border bg-background shrink-0 h-full overflow-y-auto">
-          <div className="p-4">
+        <aside
+          className={`fixed lg:static inset-y-0 left-0 z-50 lg:z-auto w-72 sm:w-80 border-r border-border bg-background shrink-0 h-full overflow-y-auto transform transition-transform duration-300 ease-in-out ${
+            isLeftSidebarOpen
+              ? "translate-x-0"
+              : "-translate-x-full lg:translate-x-0"
+          }`}
+        >
+          {/* Mobile Close Button */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-border">
+            <span className="font-semibold text-foreground">Navigation</span>
+            <button
+              onClick={() => setIsLeftSidebarOpen(false)}
+              className="p-2 hover:bg-muted rounded-md transition-colors"
+              aria-label="Close sidebar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-6">
             {/* Doc Description */}
             {doc.description && (
-              <div className="mb-6">
-                <p className="text-sm text-muted-foreground">
+              <div className="mb-6 pb-4 border-b border-border/60">
+                <p className="text-sm text-muted-foreground leading-relaxed">
                   {doc.description}
                 </p>
               </div>
@@ -140,95 +214,135 @@ function PublicDocsViewContent({
               <nav className="space-y-1">
                 {/* Pages directly in item */}
                 {itemPages.length > 0 && (
-                  <>
-                    <div className="text-xs font-semibold text-foreground/50 uppercase tracking-wider mb-2 px-3 mt-4">
-                      Pages
-                    </div>
+                  <div className="mt-4 space-y-0.5">
                     {itemPages.map((page) => (
                       <Link
                         key={page.id}
                         href={`/docs/${doc.slug}/${page.slug}${
                           selectedDocItemId ? `?item=${selectedDocItemId}` : ""
                         }`}
-                        className="block px-3 py-1.5 text-sm rounded-md transition-colors text-foreground/70 hover:text-foreground hover:bg-muted"
+                        onClick={() => setIsLeftSidebarOpen(false)}
+                        className="group flex items-center px-3 py-1.5 text-sm text-foreground/70 hover:text-foreground hover:bg-muted/50 rounded-md transition-all duration-150"
                       >
-                        <div className="flex items-center space-x-2">
-                          <FileText className="w-4 h-4 shrink-0" />
-                          <span>{page.title}</span>
-                        </div>
+                        <span className="line-clamp-1">{page.title}</span>
                       </Link>
                     ))}
-                  </>
+                  </div>
                 )}
 
                 {/* Sections */}
                 {itemSections.length > 0 && (
-                  <>
-                    <div className="text-xs font-semibold text-foreground/50 uppercase tracking-wider mb-2 px-3 mt-4">
-                      Sections
-                    </div>
-                    {itemSections.map((section) => (
-                      <div key={section.id} className="mb-2">
-                        {/* Section Header */}
-                        <div className="px-3 py-1.5 text-xs font-medium text-foreground/80">
-                          {section.label}
-                        </div>
-                        {/* Pages in section */}
-                        {section.pages.length > 0 && (
-                          <div className="ml-3 space-y-1">
-                            {section.pages.map((page) => (
-                              <Link
-                                key={page.id}
-                                href={`/docs/${doc.slug}/${page.slug}${
-                                  selectedDocItemId
-                                    ? `?item=${selectedDocItemId}`
-                                    : ""
-                                }`}
-                                className="block px-3 py-1.5 text-sm rounded-md transition-colors text-foreground/70 hover:text-foreground hover:bg-muted"
-                              >
-                                <div className="flex items-center space-x-2">
-                                  <FileText className="w-4 h-4 shrink-0" />
-                                  <span>{page.title}</span>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        )}
-                        {/* Subsections */}
-                        {section.subsections.length > 0 && (
-                          <div className="ml-3 space-y-2">
-                            {section.subsections.map((subsection) => (
-                              <div key={subsection.id}>
-                                <div className="px-3 py-1 text-xs font-medium text-foreground/70">
-                                  {subsection.label}
-                                </div>
-                                {subsection.pages.length > 0 && (
-                                  <div className="ml-3 space-y-1">
-                                    {subsection.pages.map((page) => (
-                                      <Link
-                                        key={page.id}
-                                        href={`/docs/${doc.slug}/${page.slug}${
-                                          selectedDocItemId
-                                            ? `?item=${selectedDocItemId}`
-                                            : ""
-                                        }`}
-                                        className="block px-3 py-1.5 text-sm rounded-md transition-colors text-foreground/70 hover:text-foreground hover:bg-muted"
+                  <div className="mt-6 space-y-1">
+                    {itemSections.map((section) => {
+                      const isSectionExpanded = expandedSections.has(
+                        section.id
+                      );
+                      return (
+                        <div key={section.id} className="space-y-0.5">
+                          {/* Section Header - Clean Collapsible */}
+                          <button
+                            type="button"
+                            onClick={() => toggleSection(section.id)}
+                            className="w-full flex items-center justify-between px-3 py-2 text-sm font-medium text-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-all duration-150 group"
+                          >
+                            <span className="flex-1 text-left">
+                              {section.label}
+                            </span>
+                            {isSectionExpanded ? (
+                              <ChevronUp className="w-4 h-4 shrink-0 ml-2 text-foreground/50 group-hover:text-foreground/70 transition-colors" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4 shrink-0 ml-2 text-foreground/50 group-hover:text-foreground/70 transition-colors" />
+                            )}
+                          </button>
+                          {/* Section Content - Pages and Subsections */}
+                          {isSectionExpanded && (
+                            <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/40 pl-4">
+                              {/* Pages in section */}
+                              {section.pages.length > 0 && (
+                                <>
+                                  {section.pages.map((page) => (
+                                    <Link
+                                      key={page.id}
+                                      href={`/docs/${doc.slug}/${page.slug}${
+                                        selectedDocItemId
+                                          ? `?item=${selectedDocItemId}`
+                                          : ""
+                                      }`}
+                                      onClick={() =>
+                                        setIsLeftSidebarOpen(false)
+                                      }
+                                      className="group flex items-center px-3 py-1.5 text-sm text-foreground/70 hover:text-foreground hover:bg-muted/50 rounded-md transition-all duration-150"
+                                    >
+                                      <span className="line-clamp-1">
+                                        {page.title}
+                                      </span>
+                                    </Link>
+                                  ))}
+                                </>
+                              )}
+                              {/* Subsections */}
+                              {section.subsections.length > 0 && (
+                                <div className="mt-1 space-y-0.5">
+                                  {section.subsections.map((subsection) => {
+                                    const isSubsectionExpanded =
+                                      expandedSubsections.has(subsection.id);
+                                    return (
+                                      <div
+                                        key={subsection.id}
+                                        className="space-y-0.5"
                                       >
-                                        <div className="flex items-center space-x-2">
-                                          <FileText className="w-4 h-4 shrink-0" />
-                                          <span>{page.title}</span>
-                                        </div>
-                                      </Link>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            toggleSubsection(subsection.id)
+                                          }
+                                          className="w-full flex items-center justify-between px-3 py-1.5 text-xs font-medium text-foreground/80 hover:text-foreground hover:bg-muted/50 rounded-md transition-all duration-150 group"
+                                        >
+                                          <span className="flex-1 text-left">
+                                            {subsection.label}
+                                          </span>
+                                          {isSubsectionExpanded ? (
+                                            <ChevronUp className="w-3.5 h-3.5 shrink-0 ml-2 text-foreground/40 group-hover:text-foreground/60 transition-colors" />
+                                          ) : (
+                                            <ChevronDown className="w-3.5 h-3.5 shrink-0 ml-2 text-foreground/40 group-hover:text-foreground/60 transition-colors" />
+                                          )}
+                                        </button>
+                                        {isSubsectionExpanded &&
+                                          subsection.pages.length > 0 && (
+                                            <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/30 pl-3">
+                                              {subsection.pages.map((page) => (
+                                                <Link
+                                                  key={page.id}
+                                                  href={`/docs/${doc.slug}/${
+                                                    page.slug
+                                                  }${
+                                                    selectedDocItemId
+                                                      ? `?item=${selectedDocItemId}`
+                                                      : ""
+                                                  }`}
+                                                  onClick={() =>
+                                                    setIsLeftSidebarOpen(false)
+                                                  }
+                                                  className="group flex items-center px-3 py-1.5 text-sm text-foreground/65 hover:text-foreground hover:bg-muted/50 rounded-md transition-all duration-150"
+                                                >
+                                                  <span className="line-clamp-1">
+                                                    {page.title}
+                                                  </span>
+                                                </Link>
+                                              ))}
+                                            </div>
+                                          )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 )}
 
                 {/* Empty state */}
@@ -253,7 +367,7 @@ function PublicDocsViewContent({
             {canEdit && docId && (
               <div className="mt-8 pt-6 border-t border-border">
                 <Link
-                  href={`/dashboard/docs/${docId}`}
+                  href={`/cms/docs/${docId}`}
                   className="w-full flex items-center justify-center space-x-2 px-4 py-2 text-sm border border-border rounded-md hover:bg-muted transition-colors"
                 >
                   <span>Manage Docs</span>
@@ -265,7 +379,24 @@ function PublicDocsViewContent({
 
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 h-full overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-8 py-12">
+          {/* Mobile Menu Button */}
+          <div className="lg:hidden sticky top-0 z-30 bg-background border-b border-border px-4 py-3 flex items-center justify-between">
+            <button
+              onClick={() => setIsLeftSidebarOpen(true)}
+              className="p-2 hover:bg-muted rounded-md transition-colors"
+              aria-label="Open navigation"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setIsRightSidebarOpen(true)}
+              className="xl:hidden p-2 hover:bg-muted rounded-md transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="px-4 sm:px-6 md:px-8 lg:px-12 py-8 md:py-12 lg:py-16">
             <div className="prose prose-lg dark:prose-invert max-w-none">
               <h1 className="text-4xl font-bold text-foreground mb-4">
                 {doc.title}
@@ -277,11 +408,11 @@ function PublicDocsViewContent({
               )}
 
               {/* Get Started */}
-              <div className="mt-12">
-                <h2 className="text-2xl font-semibold text-foreground mb-4">
+              <div className="mt-8 sm:mt-10 md:mt-12">
+                <h2 className="text-xl sm:text-2xl font-semibold text-foreground mb-3 sm:mb-4">
                   Getting Started
                 </h2>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
                   Select a page from the sidebar to start reading the
                   documentation.
                 </p>
@@ -293,7 +424,7 @@ function PublicDocsViewContent({
                       href={`/docs/${doc.slug}/${firstPage.slug}${
                         selectedDocItemId ? `?item=${selectedDocItemId}` : ""
                       }`}
-                      className="inline-flex items-center space-x-2 px-6 py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors font-medium"
+                      className="btn-primary inline-flex items-center space-x-2 px-6 py-3"
                     >
                       <span>Get Started</span>
                       <ChevronRight className="w-4 h-4" />
@@ -310,11 +441,11 @@ function PublicDocsViewContent({
                       </h3>
                       {/* Pages */}
                       {itemPages.length > 0 && (
-                        <div className="mb-6">
-                          <h4 className="text-md font-medium text-foreground mb-3">
+                        <div className="mb-6 sm:mb-8">
+                          <h4 className="text-base sm:text-md font-medium text-foreground mb-3">
                             Pages
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             {itemPages.map((page) => (
                               <Link
                                 key={page.id}
@@ -339,65 +470,58 @@ function PublicDocsViewContent({
                         </div>
                       )}
                       {/* Sections */}
-                      {itemSections.map((section) => (
-                        <div key={section.id} className="mb-6">
-                          <h4 className="text-md font-medium text-foreground mb-3">
-                            {section.label}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {section.pages.map((page) => (
-                              <Link
-                                key={page.id}
-                                href={`/docs/${doc.slug}/${page.slug}${
-                                  selectedDocItemId
-                                    ? `?item=${selectedDocItemId}`
-                                    : ""
-                                }`}
-                                className="group block p-6 bg-card border border-border rounded-lg hover:border-primary/50 hover:shadow-md transition-all"
-                              >
-                                <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                  {page.title}
-                                </h4>
-                                {page.summary && (
-                                  <p className="text-sm text-muted-foreground">
-                                    {page.summary}
-                                  </p>
-                                )}
-                              </Link>
-                            ))}
-                          </div>
-                          {/* Subsections */}
-                          {section.subsections.map((subsection) => (
-                            <div key={subsection.id} className="mt-4 ml-4">
-                              <h5 className="text-sm font-medium text-foreground mb-2">
-                                {subsection.label}
-                              </h5>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {subsection.pages.map((page) => (
-                                  <Link
-                                    key={page.id}
-                                    href={`/docs/${doc.slug}/${page.slug}${
-                                      selectedDocItemId
-                                        ? `?item=${selectedDocItemId}`
-                                        : ""
-                                    }`}
-                                    className="group block p-4 bg-card border border-border rounded-lg hover:border-primary/50 hover:shadow-md transition-all"
-                                  >
-                                    <h4 className="font-semibold text-foreground mb-2 group-hover:text-primary transition-colors">
-                                      {page.title}
-                                    </h4>
-                                    {page.summary && (
-                                      <p className="text-sm text-muted-foreground">
-                                        {page.summary}
-                                      </p>
-                                    )}
-                                  </Link>
+                      {itemSections.map((section) => {
+                        // Collect all pages from section and subsections
+                        const allSectionPages = [
+                          ...section.pages,
+                          ...section.subsections.flatMap(
+                            (subsection) => subsection.pages
+                          ),
+                        ];
+
+                        return (
+                          <div key={section.id} className="mb-6 sm:mb-8">
+                            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-3 sm:mb-4 pb-2 border-b border-border/60">
+                              {section.label}
+                            </h3>
+
+                            {/* All pages as links (from section and subsections) */}
+                            {allSectionPages.length > 0 ? (
+                              <ul className="space-y-2">
+                                {allSectionPages.map((page) => (
+                                  <li key={page.id}>
+                                    <Link
+                                      href={`/docs/${doc.slug}/${page.slug}${
+                                        selectedDocItemId
+                                          ? `?item=${selectedDocItemId}`
+                                          : ""
+                                      }`}
+                                      className="group flex items-center gap-3 px-4 py-3 text-sm text-foreground/70 hover:text-foreground hover:bg-muted/50 rounded-md transition-all border border-transparent hover:border-border/50"
+                                    >
+                                      <FileText className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors" />
+                                      <div className="flex-1 min-w-0">
+                                        <span className="font-medium">
+                                          {page.title}
+                                        </span>
+                                        {page.summary && (
+                                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                            {page.summary}
+                                          </p>
+                                        )}
+                                      </div>
+                                      <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground group-hover:text-primary opacity-0 group-hover:opacity-100 transition-all" />
+                                    </Link>
+                                  </li>
                                 ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">
+                                No pages available in this section.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
               </div>
@@ -406,7 +530,75 @@ function PublicDocsViewContent({
         </main>
 
         {/* Right Sidebar - Empty for homepage */}
-        <aside className="w-64 border-l border-border bg-background shrink-0 h-full" />
+        <aside
+          className={`fixed xl:static inset-y-0 right-0 z-50 xl:z-auto w-72 sm:w-80 border-l border-border bg-background shrink-0 h-full overflow-y-auto transform transition-transform duration-300 ease-in-out ${
+            isRightSidebarOpen
+              ? "translate-x-0"
+              : "translate-x-full xl:translate-x-0"
+          }`}
+        >
+          {/* Mobile Close Button */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-border">
+            <span className="font-semibold text-foreground">Quick Links</span>
+            <button
+              onClick={() => setIsRightSidebarOpen(false)}
+              className="p-2 hover:bg-muted rounded-md transition-colors"
+              aria-label="Close sidebar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="p-4 sm:p-6">
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-4">
+                  Quick Links
+                </h3>
+                <div className="space-y-2">
+                  <Link
+                    href={`/docs/${doc.slug}`}
+                    className="block text-sm text-foreground/70 hover:text-foreground hover:bg-muted px-3 py-2 rounded-md transition-colors"
+                  >
+                    Documentation Home
+                  </Link>
+                  {firstPage && (
+                    <Link
+                      href={`/docs/${doc.slug}/${firstPage.slug}${
+                        selectedDocItemId ? `?item=${selectedDocItemId}` : ""
+                      }`}
+                      className="block text-sm text-foreground/70 hover:text-foreground hover:bg-muted px-3 py-2 rounded-md transition-colors"
+                    >
+                      Getting Started
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {selectedItem && (
+                <div>
+                  <h3 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-4">
+                    {selectedItem.label}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedItem.description ||
+                      "Select a page from the sidebar to view its table of contents and additional information."}
+                  </p>
+                </div>
+              )}
+
+              {doc.description && (
+                <div>
+                  <h3 className="text-xs font-semibold text-foreground/70 uppercase tracking-wider mb-4">
+                    About
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {doc.description}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
@@ -415,14 +607,7 @@ function PublicDocsViewContent({
 export function PublicDocsView(props: PublicDocsViewProps) {
   return (
     <Suspense
-      fallback={
-        <div className="h-screen bg-background flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading documentation...</p>
-          </div>
-        </div>
-      }
+      fallback={<LoadingSpinner fullScreen text="Loading documentation..." />}
     >
       <PublicDocsViewContent {...props} />
     </Suspense>

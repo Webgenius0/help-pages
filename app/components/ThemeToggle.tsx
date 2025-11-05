@@ -51,7 +51,7 @@ export function ThemeToggle() {
             className="fixed inset-0 z-40"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-36 bg-popover border border-border rounded-lg shadow-lg z-50">
+          <div className="absolute right-0 mt-2 w-40 sm:w-36 bg-popover border border-border rounded-lg shadow-lg z-50">
             <div className="py-1">
               {themes.map((themeOption) => (
                 <button
@@ -60,16 +60,16 @@ export function ThemeToggle() {
                     setTheme(themeOption.value);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left px-4 py-2 text-sm flex items-center space-x-3 hover:bg-accent transition-colors ${
+                  className={`w-full text-left px-4 py-2.5 text-sm flex items-center space-x-3 hover:bg-accent transition-colors ${
                     theme === themeOption.value
                       ? "bg-accent text-primary font-medium"
                       : "text-foreground"
                   }`}
                 >
                   <span className="shrink-0">{themeOption.icon}</span>
-                  <span>{themeOption.label}</span>
+                  <span className="flex-1">{themeOption.label}</span>
                   {theme === themeOption.value && (
-                    <span className="ml-auto text-primary">✓</span>
+                    <span className="ml-auto text-primary text-base">✓</span>
                   )}
                 </button>
               ))}

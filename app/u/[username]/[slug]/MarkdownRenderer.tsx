@@ -61,7 +61,7 @@ export default function MarkdownRenderer({ content }: MarkdownRendererProps) {
         const text = line.slice(4)
         const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
         elements.push(
-          <h3 key={idx} id={id} className="text-xl font-bold mt-8 mb-4 scroll-mt-24">
+          <h3 key={idx} id={id} className="text-lg font-semibold mt-8 mb-3 scroll-mt-24 text-foreground/90 pl-3 border-l-2 border-primary/30">
             {text}
           </h3>
         )

@@ -141,7 +141,7 @@ export function SearchBar() {
         <input
           ref={inputRef}
           type="text"
-          placeholder="Search documentation... (⌘K)"
+          placeholder="Search documentation..."
           value={query}
           onChange={handleInputChange}
           onFocus={() => query.trim().length > 0 && setIsOpen(true)}

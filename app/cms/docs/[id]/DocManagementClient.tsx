@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -17,6 +17,9 @@ import {
   Settings,
 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
+import toast from "react-hot-toast";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 
 interface Profile {
   id: string;
@@ -117,6 +120,24 @@ export function DocManagementClient({
     null
   );
   const [error, setError] = useState<string | null>(null);
+  const hasAutoExpandedRef = useRef(false);
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger";
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    variant: "default",
+    isLoading: false,
+  });
 
   // Form states
   const [dropdownForm, setDropdownForm] = useState({
@@ -141,14 +162,23 @@ export function DocManagementClient({
 
   useEffect(() => {
     loadDoc();
+    // Reset auto-expand flag when doc changes
+    hasAutoExpandedRef.current = false;
   }, [doc.id]);
 
   useEffect(() => {
-    // Auto-expand first dropdown
-    if (doc.navHeaders.length > 0 && expandedDropdowns.length === 0) {
-      setExpandedDropdowns([doc.navHeaders[0].id]);
+    // Auto-expand first dropdown only once when navHeaders first loads
+    // Don't depend on expandedDropdowns.length to prevent re-expanding when user closes
+    if (
+      doc.navHeaders.length > 0 &&
+      !hasAutoExpandedRef.current &&
+      expandedDropdowns.length === 0
+    ) {
+      const firstHeaderId = doc.navHeaders[0].id;
+      setExpandedDropdowns([firstHeaderId]);
+      hasAutoExpandedRef.current = true;
     }
-  }, [doc.navHeaders, expandedDropdowns.length]);
+  }, [doc.navHeaders]);
 
   const loadDoc = async () => {
     try {
@@ -438,7 +468,7 @@ export function DocManagementClient({
       setShowNewPageModal(false);
       setPageForm({ title: "", slug: "", navHeaderId: null });
       // Navigate to the new page editor
-      router.push(`/dashboard/pages/${data.page.id}`);
+      router.push(`/cms/pages/${data.page.id}`);
     } catch (err: any) {
       setError(err.message || "Failed to create page");
     } finally {
@@ -447,58 +477,80 @@ export function DocManagementClient({
   };
 
   const handleDeleteDocItem = async (itemId: string, label: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${label}"? All pages and sections in this item will be deleted.`
-      )
-    ) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Item",
+      message: `Are you sure you want to delete "${label}"? All pages and sections in this item will be deleted.`,
+      variant: "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          const response = await fetch(`/api/doc-items/${itemId}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const response = await fetch(`/api/doc-items/${itemId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        await loadDoc();
-      } else {
-        const data = await response.json();
-        alert(data.error || "Failed to delete item");
-      }
-    } catch (error) {
-      console.error("Failed to delete item:", error);
-      alert("Failed to delete item");
-    }
+          if (response.ok) {
+            await loadDoc();
+            toast.success("Item deleted successfully!");
+            setConfirmModal({
+              isOpen: false,
+              title: "",
+              message: "",
+              onConfirm: () => {},
+            });
+          } else {
+            const data = await response.json();
+            toast.error(data.error || "Failed to delete item");
+            setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+          }
+        } catch (error) {
+          console.error("Failed to delete item:", error);
+          toast.error("Failed to delete item");
+          setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+        }
+      },
+    });
   };
 
   const handleDeleteDropdown = async (dropdownId: string, label: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${label}"? All items, pages and sections in this dropdown will be deleted.`
-      )
-    ) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Dropdown",
+      message: `Are you sure you want to delete "${label}"? All items, pages and sections in this dropdown will be deleted.`,
+      variant: "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          const response = await fetch(
+            `/api/nav-headers?id=${encodeURIComponent(dropdownId)}`,
+            {
+              method: "DELETE",
+            }
+          );
 
-    try {
-      const response = await fetch(
-        `/api/nav-headers?id=${encodeURIComponent(dropdownId)}`,
-        {
-          method: "DELETE",
+          if (response.ok) {
+            await loadDoc();
+            toast.success("Dropdown deleted successfully!");
+            setConfirmModal({
+              isOpen: false,
+              title: "",
+              message: "",
+              onConfirm: () => {},
+            });
+          } else {
+            const data = await response.json();
+            toast.error(data.error || "Failed to delete dropdown");
+            setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+          }
+        } catch (error) {
+          console.error("Failed to delete dropdown:", error);
+          toast.error("Failed to delete dropdown");
+          setConfirmModal((prev) => ({ ...prev, isLoading: false }));
         }
-      );
-
-      if (response.ok) {
-        await loadDoc();
-      } else {
-        const data = await response.json();
-        alert(data.error || "Failed to delete dropdown");
-      }
-    } catch (error) {
-      console.error("Failed to delete dropdown:", error);
-      alert("Failed to delete dropdown");
-    }
+      },
+    });
   };
 
   const toggleDropdown = (dropdownId: string) => {
@@ -526,48 +578,63 @@ export function DocManagementClient({
   };
 
   const handleDeletePage = async (pageId: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete "${title}"?`)) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Page",
+      message: `Are you sure you want to delete "${title}"?`,
+      variant: "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          const response = await fetch(`/api/pages/${pageId}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const response = await fetch(`/api/pages/${pageId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        await loadDoc();
-      } else {
-        const data = await response.json();
-        alert(data.error || "Failed to delete page");
-      }
-    } catch (error) {
-      console.error("Failed to delete page:", error);
-      alert("Failed to delete page");
-    }
+          if (response.ok) {
+            await loadDoc();
+            toast.success("Page deleted successfully!");
+            setConfirmModal({
+              isOpen: false,
+              title: "",
+              message: "",
+              onConfirm: () => {},
+            });
+          } else {
+            const data = await response.json();
+            toast.error(data.error || "Failed to delete page");
+            setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+          }
+        } catch (error) {
+          console.error("Failed to delete page:", error);
+          toast.error("Failed to delete page");
+          setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+        }
+      },
+    });
   };
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
-            <div className="flex-1">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
+            <div className="flex-1 min-w-0">
               <Link
-                href="/dashboard"
-                className="text-sm text-muted-foreground hover:text-primary mb-2 inline-block"
+                href="/cms"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-primary mb-2 inline-block"
               >
                 ← Back to Documentation Projects
               </Link>
-              <h1 className="text-4xl font-bold text-foreground mb-2">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 wrap-break-word">
                 {doc.title}
               </h1>
-              <p className="text-lg text-muted-foreground mb-4">
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground mb-3 sm:mb-4">
                 {doc.description || "Manage pages and sections"}
               </p>
 
-              <div className="flex items-center space-x-4 text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                 <span className="text-muted-foreground">
                   {doc._count.pages} pages
                 </span>
@@ -577,18 +644,18 @@ export function DocManagementClient({
                     target="_blank"
                     className="text-primary hover:underline flex items-center space-x-1"
                   >
-                    <Eye className="w-4 h-4" />
+                    <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                     <span>View Public Site</span>
                   </Link>
                 )}
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 shrink-0">
               <button
                 onClick={handleAddDropdown}
-                className="btn-primary flex items-center space-x-2"
+                className="btn-primary flex items-center space-x-2 text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-2.5 w-full sm:w-auto justify-center"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Add Dropdown</span>
               </button>
             </div>
@@ -597,21 +664,24 @@ export function DocManagementClient({
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg">
+          <div className="mb-4 sm:mb-6 bg-destructive/10 border border-destructive/20 text-destructive px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm sm:text-base">
             {error}
           </div>
         )}
 
         {/* New Section Modal */}
         {showNewSectionModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background border border-border rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+            <div className="bg-background border border-border rounded-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">
                 {sectionForm.parentId ? "Add Subsection" : "Add Section"}
               </h2>
-              <form onSubmit={handleCreateSection} className="space-y-4">
+              <form
+                onSubmit={handleCreateSection}
+                className="space-y-3 sm:space-y-4"
+              >
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Label <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -632,12 +702,12 @@ export function DocManagementClient({
                             : sectionForm.slug,
                       });
                     }}
-                    className="w-full h-12 px-4 border border-border rounded-lg bg-input text-foreground"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground"
                     placeholder="Getting Started"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Slug <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -650,7 +720,7 @@ export function DocManagementClient({
                         slug: generateSlug(e.target.value),
                       })
                     }
-                    className={`w-full h-12 px-4 border rounded-lg bg-input text-foreground font-mono text-sm ${
+                    className={`w-full h-10 sm:h-12 px-3 sm:px-4 border rounded-lg bg-input text-foreground font-mono text-xs sm:text-sm ${
                       sectionForm.slug && !isValidSlug(sectionForm.slug)
                         ? "border-destructive focus:ring-destructive"
                         : "border-border focus:ring-primary"
@@ -664,21 +734,21 @@ export function DocManagementClient({
                     </p>
                   )}
                 </div>
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3 pt-3 sm:pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowNewSectionModal(false);
                       setError(null);
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                     disabled={creatingSection}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary flex items-center justify-center"
+                    className="btn-primary flex items-center justify-center w-full sm:w-auto"
                     disabled={creatingSection}
                   >
                     {creatingSection ? (
@@ -698,14 +768,17 @@ export function DocManagementClient({
 
         {/* New Dropdown Modal */}
         {showNewDropdownModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background border border-border rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+            <div className="bg-background border border-border rounded-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">
                 Add New Dropdown
               </h2>
-              <form onSubmit={handleCreateDropdown} className="space-y-4">
+              <form
+                onSubmit={handleCreateDropdown}
+                className="space-y-3 sm:space-y-4"
+              >
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Label <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -725,12 +798,12 @@ export function DocManagementClient({
                             : dropdownForm.slug,
                       });
                     }}
-                    className="w-full h-12 px-4 border border-border rounded-lg bg-input text-foreground"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground"
                     placeholder="Products, Build, Manage"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Slug <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -743,7 +816,7 @@ export function DocManagementClient({
                         slug: generateSlug(e.target.value),
                       })
                     }
-                    className={`w-full h-12 px-4 border rounded-lg bg-input text-foreground font-mono text-sm ${
+                    className={`w-full h-10 sm:h-12 px-3 sm:px-4 border rounded-lg bg-input text-foreground font-mono text-xs sm:text-sm ${
                       dropdownForm.slug && !isValidSlug(dropdownForm.slug)
                         ? "border-destructive focus:ring-destructive"
                         : "border-border focus:ring-primary"
@@ -757,21 +830,21 @@ export function DocManagementClient({
                     </p>
                   )}
                 </div>
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3 pt-3 sm:pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowNewDropdownModal(false);
                       setError(null);
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                     disabled={creatingDropdown}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary flex items-center justify-center"
+                    className="btn-primary flex items-center justify-center w-full sm:w-auto"
                     disabled={creatingDropdown}
                   >
                     {creatingDropdown ? (
@@ -791,14 +864,17 @@ export function DocManagementClient({
 
         {/* New Doc Item Modal */}
         {showNewDocItemModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background border border-border rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+            <div className="bg-background border border-border rounded-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">
                 Add New Item
               </h2>
-              <form onSubmit={handleCreateDocItem} className="space-y-4">
+              <form
+                onSubmit={handleCreateDocItem}
+                className="space-y-3 sm:space-y-4"
+              >
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Label <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -819,12 +895,12 @@ export function DocManagementClient({
                             : docItemForm.slug,
                       });
                     }}
-                    className="w-full h-12 px-4 border border-border rounded-lg bg-input text-foreground"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground"
                     placeholder="v1.0, Stable, Beta"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Slug <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -837,7 +913,7 @@ export function DocManagementClient({
                         slug: generateSlug(e.target.value),
                       })
                     }
-                    className={`w-full h-12 px-4 border rounded-lg bg-input text-foreground font-mono text-sm ${
+                    className={`w-full h-10 sm:h-12 px-3 sm:px-4 border rounded-lg bg-input text-foreground font-mono text-xs sm:text-sm ${
                       docItemForm.slug && !isValidSlug(docItemForm.slug)
                         ? "border-destructive focus:ring-destructive"
                         : "border-border focus:ring-primary"
@@ -852,7 +928,7 @@ export function DocManagementClient({
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Description (optional)
                   </label>
                   <textarea
@@ -864,25 +940,25 @@ export function DocManagementClient({
                       })
                     }
                     rows={3}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                     placeholder="Brief description of this version/item..."
                   />
                 </div>
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3 pt-3 sm:pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowNewDocItemModal(false);
                       setError(null);
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                     disabled={creatingDocItem}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary flex items-center justify-center"
+                    className="btn-primary flex items-center justify-center w-full sm:w-auto"
                     disabled={creatingDocItem}
                   >
                     {creatingDocItem ? (
@@ -902,14 +978,17 @@ export function DocManagementClient({
 
         {/* New Page Modal */}
         {showNewPageModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background border border-border rounded-lg max-w-md w-full p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+            <div className="bg-background border border-border rounded-lg max-w-md w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">
                 Add New Page
               </h2>
-              <form onSubmit={handleCreatePage} className="space-y-4">
+              <form
+                onSubmit={handleCreatePage}
+                className="space-y-3 sm:space-y-4"
+              >
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Title <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -930,12 +1009,12 @@ export function DocManagementClient({
                             : pageForm.slug,
                       });
                     }}
-                    className="w-full h-12 px-4 border border-border rounded-lg bg-input text-foreground"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground"
                     placeholder="Introduction"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
+                  <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2">
                     Slug <span className="text-destructive">*</span>
                   </label>
                   <input
@@ -948,7 +1027,7 @@ export function DocManagementClient({
                         slug: generateSlug(e.target.value),
                       })
                     }
-                    className={`w-full h-12 px-4 border rounded-lg bg-input text-foreground font-mono text-sm ${
+                    className={`w-full h-10 sm:h-12 px-3 sm:px-4 border rounded-lg bg-input text-foreground font-mono text-xs sm:text-sm ${
                       pageForm.slug && !isValidSlug(pageForm.slug)
                         ? "border-destructive focus:ring-destructive"
                         : "border-border focus:ring-primary"
@@ -962,21 +1041,21 @@ export function DocManagementClient({
                     </p>
                   )}
                 </div>
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3 pt-3 sm:pt-4">
                   <button
                     type="button"
                     onClick={() => {
                       setShowNewPageModal(false);
                       setError(null);
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto"
                     disabled={creatingPage}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary flex items-center justify-center"
+                    className="btn-primary flex items-center justify-center w-full sm:w-auto"
                     disabled={creatingPage}
                   >
                     {creatingPage ? (
@@ -997,28 +1076,26 @@ export function DocManagementClient({
         {/* Header Dropdowns */}
         {loading ? (
           <div className="text-center py-16">
-            <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-muted-foreground">
-                Loading documentation structure...
-              </p>
-            </div>
+            <LoadingSpinner
+              size="lg"
+              text="Loading documentation structure..."
+            />
           </div>
         ) : !doc.navHeaders || doc.navHeaders.length === 0 ? (
-          <div className="text-center py-16">
-            <BookOpen className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">
+          <div className="text-center py-12 sm:py-16">
+            <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
               No dropdowns yet
             </h3>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6 px-4">
               Start by adding a header dropdown (like "Products", "Build",
               "Manage") to organize your documentation
             </p>
             <button
               onClick={handleAddDropdown}
-              className="btn-primary inline-flex items-center space-x-2"
+              className="btn-primary inline-flex items-center space-x-2 text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-2.5"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
               <span>Add Dropdown</span>
             </button>
           </div>
@@ -1030,14 +1107,14 @@ export function DocManagementClient({
                 dropdown.docItems && dropdown.docItems.length > 0;
 
               return (
-                <div key={dropdown.id} className="mb-6">
+                <div key={dropdown.id} className="mb-4 sm:mb-6">
                   {/* Dropdown Header */}
-                  <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
-                    <div className="flex items-center space-x-3 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 p-3 sm:p-4 bg-card border border-border rounded-lg">
+                    <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                       {hasItems && (
                         <button
                           onClick={() => toggleDropdown(dropdown.id)}
-                          className="p-1 hover:bg-accent rounded"
+                          className="p-1 hover:bg-accent rounded shrink-0"
                         >
                           {isExpanded ? (
                             <ChevronDown className="w-4 h-4" />
@@ -1046,25 +1123,26 @@ export function DocManagementClient({
                           )}
                         </button>
                       )}
-                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <BookOpen className="w-5 h-5 text-primary" />
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                        <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
                       </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-foreground">
+                      <div className="min-w-0 flex-1">
+                        <h2 className="text-base sm:text-lg font-semibold text-foreground truncate">
                           {dropdown.label}
                         </h2>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-muted-foreground truncate">
                           /{dropdown.slug}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 shrink-0">
                       <button
                         onClick={() => handleAddDocItem(dropdown.id)}
-                        className="btn-secondary text-sm flex items-center space-x-1"
+                        className="btn-secondary text-xs sm:text-sm flex items-center space-x-1 px-2 sm:px-3 py-1.5 sm:py-2"
                       >
                         <Plus className="w-3 h-3" />
-                        <span>Add Item</span>
+                        <span className="hidden sm:inline">Add Item</span>
+                        <span className="sm:hidden">Add</span>
                       </button>
                       {(profile.role === "admin" ||
                         doc.userId === profile.id) && (
@@ -1072,7 +1150,7 @@ export function DocManagementClient({
                           onClick={() =>
                             handleDeleteDropdown(dropdown.id, dropdown.label)
                           }
-                          className="p-2 text-destructive hover:bg-destructive/10 rounded"
+                          className="p-2 text-destructive hover:bg-destructive/10 rounded shrink-0"
                           title="Delete Dropdown"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -1083,7 +1161,7 @@ export function DocManagementClient({
 
                   {/* Dropdown Items */}
                   {isExpanded && hasItems && (
-                    <div className="mt-4 ml-6 space-y-4">
+                    <div className="mt-3 sm:mt-4 ml-2 sm:ml-6 space-y-3 sm:space-y-4">
                       {dropdown.docItems!.map((item) => {
                         const isItemExpanded = expandedItems.includes(item.id);
                         const hasContent =
@@ -1093,28 +1171,28 @@ export function DocManagementClient({
                         return (
                           <div
                             key={item.id}
-                            className="border-l-2 border-border pl-4"
+                            className="border-l-2 border-border pl-2 sm:pl-4"
                           >
                             {/* Item Header */}
-                            <div className="flex items-center justify-between p-3 bg-muted/30 border border-border rounded-md">
-                              <div className="flex items-center space-x-3 flex-1">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 p-2 sm:p-3 bg-muted/30 border border-border rounded-md">
+                              <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
                                 {hasContent && (
                                   <button
                                     onClick={() => toggleItem(item.id)}
-                                    className="p-1 hover:bg-accent rounded"
+                                    className="p-1 hover:bg-accent rounded shrink-0"
                                   >
                                     {isItemExpanded ? (
-                                      <ChevronDown className="w-4 h-4" />
+                                      <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                                     ) : (
-                                      <ChevronRight className="w-4 h-4" />
+                                      <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
                                     )}
                                   </button>
                                 )}
-                                <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                                  <FileText className="w-4 h-4 text-primary" />
+                                <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/10 rounded flex items-center justify-center shrink-0">
+                                  <FileText className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                                 </div>
-                                <div>
-                                  <h3 className="font-medium text-foreground">
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="text-sm sm:text-base font-medium text-foreground truncate">
                                     {item.label}
                                   </h3>
                                   <p className="text-xs text-muted-foreground">
@@ -1123,17 +1201,17 @@ export function DocManagementClient({
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-2">
+                              <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
                                 <button
                                   onClick={() => handleAddPage(item.id)}
-                                  className="btn-secondary text-xs flex items-center space-x-1"
+                                  className="btn-secondary text-xs flex items-center space-x-1 px-2 py-1.5"
                                 >
                                   <Plus className="w-3 h-3" />
                                   <span>Page</span>
                                 </button>
                                 <button
                                   onClick={() => handleAddSection(item.id)}
-                                  className="btn-secondary text-xs flex items-center space-x-1"
+                                  className="btn-secondary text-xs flex items-center space-x-1 px-2 py-1.5"
                                 >
                                   <Plus className="w-3 h-3" />
                                   <span>Section</span>
@@ -1144,7 +1222,7 @@ export function DocManagementClient({
                                     onClick={() =>
                                       handleDeleteDocItem(item.id, item.label)
                                     }
-                                    className="p-2 text-destructive hover:bg-destructive/10 rounded"
+                                    className="p-1.5 sm:p-2 text-destructive hover:bg-destructive/10 rounded shrink-0"
                                     title="Delete Item"
                                   >
                                     <Trash2 className="w-3 h-3" />
@@ -1155,47 +1233,51 @@ export function DocManagementClient({
 
                             {/* Item Content: Pages and Sections */}
                             {isItemExpanded && (
-                              <div className="mt-2 ml-4 space-y-2">
+                              <div className="mt-2 ml-2 sm:ml-4 space-y-2">
                                 {/* Pages in Item */}
                                 {item.pages && item.pages.length > 0 && (
                                   <div className="space-y-2">
                                     {item.pages.map((page) => (
                                       <div
                                         key={page.id}
-                                        className="flex items-center justify-between p-3 bg-muted/50 border border-border rounded-md hover:border-primary/50 transition-colors"
+                                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 p-2 sm:p-3 bg-muted/50 border border-border rounded-md hover:border-primary/50 transition-colors"
                                       >
-                                        <div className="flex items-center space-x-3 flex-1">
-                                          <FileText className="w-4 h-4 text-muted-foreground" />
-                                          <div className="flex-1">
+                                        <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                                          <FileText className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground shrink-0" />
+                                          <div className="flex-1 min-w-0">
                                             <Link
-                                              href={`/dashboard/pages/${page.id}`}
-                                              className="font-medium text-foreground hover:text-primary flex items-center space-x-2 group"
+                                              href={`/cms/pages/${page.id}`}
+                                              className="text-sm sm:text-base font-medium text-foreground hover:text-primary flex items-center space-x-2 group truncate"
                                             >
-                                              <span>{page.title}</span>
-                                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                              <span className="truncate">
+                                                {page.title}
+                                              </span>
+                                              <Edit2 className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 hidden sm:block" />
                                             </Link>
-                                            <p className="text-xs text-muted-foreground mt-1">
+                                            <p className="text-xs text-muted-foreground mt-1 truncate">
                                               /{page.slug} • {page.status}
                                             </p>
                                           </div>
                                         </div>
-                                        <div className="flex items-center space-x-2">
+                                        <div className="flex items-center space-x-1 sm:space-x-2 shrink-0">
                                           <Link
-                                            href={`/dashboard/pages/${page.id}`}
-                                            className="btn-primary text-xs px-3 py-1.5 flex items-center space-x-1"
+                                            href={`/cms/pages/${page.id}`}
+                                            className="btn-primary text-xs px-2 sm:px-3 py-1 sm:py-1.5 flex items-center space-x-1"
                                           >
                                             <Edit2 className="w-3 h-3" />
-                                            <span>Edit</span>
+                                            <span className="hidden sm:inline">
+                                              Edit
+                                            </span>
                                           </Link>
                                           {doc.isPublic &&
                                             page.status === "published" && (
                                               <Link
                                                 href={`/docs/${doc.slug}/${page.slug}`}
                                                 target="_blank"
-                                                className="p-2 text-muted-foreground hover:text-primary"
+                                                className="p-1.5 sm:p-2 text-muted-foreground hover:text-primary shrink-0"
                                                 title="View Public"
                                               >
-                                                <Eye className="w-4 h-4" />
+                                                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
                                               </Link>
                                             )}
                                           {(profile.role === "admin" ||
@@ -1207,10 +1289,10 @@ export function DocManagementClient({
                                                   page.title
                                                 )
                                               }
-                                              className="p-2 text-destructive hover:bg-destructive/10 rounded"
+                                              className="p-1.5 sm:p-2 text-destructive hover:bg-destructive/10 rounded shrink-0"
                                               title="Delete"
                                             >
-                                              <Trash2 className="w-4 h-4" />
+                                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                                             </button>
                                           )}
                                         </div>
@@ -1232,16 +1314,16 @@ export function DocManagementClient({
                                       return (
                                         <div
                                           key={section.id}
-                                          className="border-l-2 border-primary/20 pl-3"
+                                          className="border-l-2 border-primary/20 pl-2 sm:pl-3"
                                         >
-                                          <div className="flex items-center justify-between p-2 bg-card border border-border rounded">
-                                            <div className="flex items-center space-x-2 flex-1">
+                                          <div className="flex items-center justify-between gap-2 p-2 bg-card border border-border rounded">
+                                            <div className="flex items-center space-x-1 sm:space-x-2 flex-1 min-w-0">
                                               {sectionHasPages && (
                                                 <button
                                                   onClick={() =>
                                                     toggleSection(section.id)
                                                   }
-                                                  className="p-1 hover:bg-accent rounded"
+                                                  className="p-1 hover:bg-accent rounded shrink-0"
                                                 >
                                                   {isSectionExpanded ? (
                                                     <ChevronDown className="w-3 h-3" />
@@ -1250,7 +1332,7 @@ export function DocManagementClient({
                                                   )}
                                                 </button>
                                               )}
-                                              <span className="text-sm font-medium text-foreground">
+                                              <span className="text-xs sm:text-sm font-medium text-foreground truncate">
                                                 {section.label}
                                               </span>
                                             </div>
@@ -1261,28 +1343,28 @@ export function DocManagementClient({
                                                   section.id
                                                 )
                                               }
-                                              className="btn-secondary text-xs px-2 py-1"
+                                              className="btn-secondary text-xs px-2 py-1 shrink-0"
                                             >
                                               <Plus className="w-3 h-3" />
                                             </button>
                                           </div>
                                           {isSectionExpanded &&
                                             sectionHasPages && (
-                                              <div className="mt-2 ml-4 space-y-2">
+                                              <div className="mt-2 ml-2 sm:ml-4 space-y-2">
                                                 {section.pages!.map((page) => (
                                                   <div
                                                     key={page.id}
-                                                    className="flex items-center justify-between p-2 bg-muted/50 border border-border rounded hover:border-primary/50 transition-colors"
+                                                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 p-2 bg-muted/50 border border-border rounded hover:border-primary/50 transition-colors"
                                                   >
                                                     <Link
-                                                      href={`/dashboard/pages/${page.id}`}
-                                                      className="text-sm font-medium text-foreground hover:text-primary flex-1"
+                                                      href={`/cms/pages/${page.id}`}
+                                                      className="text-xs sm:text-sm font-medium text-foreground hover:text-primary flex-1 min-w-0 truncate"
                                                     >
                                                       {page.title}
                                                     </Link>
                                                     <Link
-                                                      href={`/dashboard/pages/${page.id}`}
-                                                      className="btn-primary text-xs px-2 py-1"
+                                                      href={`/cms/pages/${page.id}`}
+                                                      className="btn-primary text-xs px-2 py-1 shrink-0 w-full sm:w-auto text-center"
                                                     >
                                                       Edit
                                                     </Link>
@@ -1300,7 +1382,7 @@ export function DocManagementClient({
                                 {(!item.pages || item.pages.length === 0) &&
                                   (!item.sections ||
                                     item.sections.length === 0) && (
-                                    <p className="text-xs text-muted-foreground italic pl-3">
+                                    <p className="text-xs text-muted-foreground italic pl-2 sm:pl-3">
                                       No pages or sections yet. Add a page or
                                       section to get started.
                                     </p>
@@ -1316,7 +1398,7 @@ export function DocManagementClient({
                   {/* Empty State for Dropdown */}
                   {isExpanded &&
                     (!hasItems || dropdown.docItems!.length === 0) && (
-                      <div className="mt-4 ml-6 text-sm text-muted-foreground italic">
+                      <div className="mt-3 sm:mt-4 ml-2 sm:ml-6 text-xs sm:text-sm text-muted-foreground italic px-2">
                         No items yet. Click "Add Item" to create an item in this
                         dropdown.
                       </div>
@@ -1327,6 +1409,24 @@ export function DocManagementClient({
           </div>
         )}
       </div>
+
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() =>
+          setConfirmModal({
+            isOpen: false,
+            title: "",
+            message: "",
+            onConfirm: () => {},
+          })
+        }
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        isLoading={confirmModal.isLoading}
+      />
     </div>
   );
 }

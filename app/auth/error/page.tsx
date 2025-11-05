@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { LoadingSpinner } from '@/app/components/LoadingSpinner'
 
 const errorMessages: Record<string, string> = {
   Configuration: 'There is a problem with the server configuration.',
@@ -56,11 +57,7 @@ export default function AuthErrorPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-alternative flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-destructive-600">Loading...</CardTitle>
-          </CardHeader>
-        </Card>
+        <LoadingSpinner text="Loading..." />
       </div>
     }>
       <ErrorContent />

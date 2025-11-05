@@ -51,7 +51,7 @@ export default async function DocManagementPage({
   const isEditor = profile.role === "editor";
 
   if (!isOwner && !isAdmin && !isEditor) {
-    redirect("/dashboard");
+    redirect("/cms");
   }
 
   // Prepare doc with empty arrays for navHeaders and pages
