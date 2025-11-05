@@ -16,6 +16,9 @@ import {
   Loader2,
 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
+import toast from "react-hot-toast";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 
 interface Profile {
   id: string;
@@ -57,6 +60,23 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
   const [creating, setCreating] = useState(false);
   const [showNewDocModal, setShowNewDocModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger";
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    variant: "default",
+    isLoading: false,
+  });
 
   // Form state for new doc
   const [docForm, setDocForm] = useState({
@@ -70,8 +90,8 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const pathname = window.location.pathname;
-      if (pathname.includes("/dashboard/all-courses")) {
-        router.replace("/dashboard");
+      if (pathname.includes("/cms/all-courses")) {
+        router.replace("/cms");
       }
     }
   }, [router]);
@@ -164,7 +184,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
         }
 
         // Redirect to doc editor
-        router.push(`/dashboard/docs/${data.doc.id}`);
+        router.push(`/cms/docs/${data.doc.id}`);
         router.refresh();
       } catch (err: any) {
         setError(err.message || "Failed to create documentation");
@@ -177,56 +197,58 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
   };
 
   const handleDeleteDoc = async (docId: string, title: string) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${title}"? All pages and sections will be deleted.`
-      )
-    ) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Documentation",
+      message: `Are you sure you want to delete "${title}"? All pages and sections will be deleted.`,
+      variant: "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          const response = await fetch(`/api/docs/${docId}`, {
+            method: "DELETE",
+          });
 
-    try {
-      const response = await fetch(`/api/docs/${docId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        await loadDocs();
-      } else {
-        const data = await response.json();
-        alert(data.error || "Failed to delete documentation");
-      }
-    } catch (error) {
-      console.error("Failed to delete doc:", error);
-      alert("Failed to delete documentation");
-    }
+          if (response.ok) {
+            await loadDocs();
+            toast.success("Documentation deleted successfully!");
+            setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+          } else {
+            const data = await response.json();
+            toast.error(data.error || "Failed to delete documentation");
+            setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+          }
+        } catch (error) {
+          console.error("Failed to delete doc:", error);
+          toast.error("Failed to delete documentation");
+          setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+        }
+      },
+    });
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <LoadingSpinner fullScreen text="Loading documentation..." />;
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="px-3 sm:px-4 md:px-6 lg:px-12 py-4 sm:py-6 md:py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
             <div>
-              <h1 className="text-4xl font-bold text-foreground mb-3">
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-2 sm:mb-3">
                 Documentation Projects
               </h1>
-              <p className="text-lg text-muted-foreground">
+              <p className="text-sm sm:text-base md:text-lg text-muted-foreground">
                 Create and manage your documentation sites
               </p>
             </div>
             <button
               onClick={() => setShowNewDocModal(true)}
-              className="btn-primary flex items-center space-x-2"
+              className="btn-primary flex items-center justify-center space-x-2 px-4 py-2 sm:px-6 sm:py-2.5 text-sm sm:text-base w-full sm:w-auto"
             >
               <Plus className="w-4 h-4" />
               <span>New Documentation</span>
@@ -243,9 +265,9 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
 
         {/* New Doc Modal */}
         {showNewDocModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-background border border-border rounded-lg max-w-2xl w-full p-6">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-3 sm:p-4">
+            <div className="bg-background border border-border rounded-lg max-w-2xl w-full p-4 sm:p-6 max-h-[90vh] overflow-y-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground mb-4 sm:mb-6">
                 Create New Documentation
               </h2>
               <form onSubmit={handleCreateDoc} className="space-y-4">
@@ -263,7 +285,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                     required
                     value={docForm.title}
                     onChange={(e) => handleTitleChange(e.target.value)}
-                    className="w-full h-12 px-4 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full h-10 sm:h-12 px-3 sm:px-4 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary text-sm sm:text-base"
                     placeholder="My Product Documentation"
                   />
                 </div>
@@ -290,7 +312,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                           slug: generateSlug(e.target.value),
                         })
                       }
-                      className={`flex-1 h-12 px-4 border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 font-mono text-sm ${
+                      className={`flex-1 h-10 sm:h-12 px-3 sm:px-4 border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 font-mono text-xs sm:text-sm ${
                         docForm.slug && !isValidSlug(docForm.slug)
                           ? "border-destructive focus:ring-destructive"
                           : "border-border focus:ring-primary"
@@ -324,7 +346,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                       setDocForm({ ...docForm, description: e.target.value })
                     }
                     rows={3}
-                    className="w-full px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    className="w-full px-3 sm:px-4 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary resize-none text-sm sm:text-base"
                     placeholder="Brief description of your documentation..."
                   />
                 </div>
@@ -347,7 +369,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                   </label>
                 </div>
 
-                <div className="flex justify-end space-x-3 pt-4">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 sm:space-x-3 pt-4">
                   <button
                     type="button"
                     onClick={() => {
@@ -360,13 +382,13 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                       });
                       setError(null);
                     }}
-                    className="btn-secondary"
+                    className="btn-secondary w-full sm:w-auto px-4 py-2 text-sm sm:text-base"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="btn-primary flex items-center justify-center"
+                    className="btn-primary flex items-center justify-center w-full sm:w-auto px-4 py-2 text-sm sm:text-base"
                     disabled={creating}
                   >
                     {creating ? (
@@ -386,46 +408,46 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
 
         {/* Docs Grid */}
         {docs.length === 0 ? (
-          <div className="text-center py-16">
-            <BookOpen className="w-16 h-16 mx-auto mb-4 text-muted-foreground opacity-50" />
-            <h3 className="text-xl font-semibold text-foreground mb-2">
+          <div className="text-center py-12 sm:py-16">
+            <BookOpen className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" />
+            <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
               No documentation yet
             </h3>
-            <p className="text-muted-foreground mb-6">
+            <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6 px-4">
               Create your first documentation project to get started
             </p>
             <button
               onClick={() => setShowNewDocModal(true)}
-              className="btn-primary inline-flex items-center space-x-2"
+              className="btn-primary inline-flex items-center space-x-2 px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base"
             >
               <Plus className="w-4 h-4" />
               <span>Create Documentation</span>
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {docs.map((doc) => (
               <div
                 key={doc.id}
                 className="card hover:shadow-lg transition-shadow"
               >
                 <div className="card-content">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                        <BookOpen className="w-6 h-6 text-primary" />
+                  <div className="flex items-start justify-between mb-3 sm:mb-4">
+                    <div className="flex items-center space-x-2 sm:space-x-3 flex-1 min-w-0">
+                      <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0">
+                        <BookOpen className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                       </div>
-                      <div>
-                        <h3 className="font-semibold text-foreground text-lg">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-foreground text-base sm:text-lg line-clamp-2">
                           {doc.title}
                         </h3>
                         <div className="flex items-center space-x-2 mt-1">
                           {doc.isPublic ? (
-                            <Globe className="w-3 h-3 text-primary" />
+                            <Globe className="w-3 h-3 text-primary shrink-0" />
                           ) : (
-                            <Lock className="w-3 h-3 text-muted-foreground" />
+                            <Lock className="w-3 h-3 text-muted-foreground shrink-0" />
                           )}
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-xs text-muted-foreground truncate">
                             /docs/{doc.slug}
                           </span>
                         </div>
@@ -434,34 +456,34 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                   </div>
 
                   {doc.description && (
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4 line-clamp-2">
                       {doc.description}
                     </p>
                   )}
 
-                  <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                     <span>{doc._count.pages} pages</span>
-                    <span>
+                    <span className="text-xs">
                       Updated {new Date(doc.updatedAt).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <div className="flex items-center space-x-2 pt-4 border-t border-border">
+                  <div className="flex items-center gap-2 pt-3 sm:pt-4 border-t border-border">
                     <Link
-                      href={`/dashboard/docs/${doc.id}`}
-                      className="btn-primary flex-1 flex items-center justify-center space-x-2 text-sm"
+                      href={`/cms/docs/${doc.id}`}
+                      className="btn-primary flex-1 flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm py-2 sm:py-2.5"
                     >
-                      <Edit2 className="w-4 h-4" />
+                      <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>Manage</span>
                     </Link>
                     {doc.isPublic && (
                       <Link
                         href={`/docs/${doc.slug}`}
                         target="_blank"
-                        className="btn-secondary flex items-center space-x-2 text-sm"
+                        className="btn-secondary flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4"
                       >
-                        <Eye className="w-4 h-4" />
-                        <span>View</span>
+                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">View</span>
                       </Link>
                     )}
                     {/* Only show delete button to owner or admin (not editors) */}
@@ -469,7 +491,7 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                       doc.userId === profile?.id) && (
                       <button
                         onClick={() => handleDeleteDoc(doc.id, doc.title)}
-                        className="p-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                        className="p-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors shrink-0"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -482,6 +504,17 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
           </div>
         )}
       </div>
+      
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        isLoading={confirmModal.isLoading}
+      />
     </div>
   );
 }

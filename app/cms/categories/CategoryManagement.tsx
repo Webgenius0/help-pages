@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Breadcrumb } from "@/app/components/Breadcrumb";
 import { Plus, Edit2, Trash2, Folder, Save, X, Loader2 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
+import toast from "react-hot-toast";
+import { ConfirmModal } from "@/app/components/ConfirmModal";
 
 interface NavHeader {
   id: string;
@@ -32,17 +34,34 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
   const [newCategory, setNewCategory] = useState({ label: "", slug: "", parentId: null as string | null });
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [creating, setCreating] = useState(false);
+  
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    variant?: "default" | "danger";
+    isLoading?: boolean;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+    variant: "default",
+    isLoading: false,
+  });
 
   const handleCreate = async () => {
     if (!newCategory.label.trim()) {
-      alert('Label is required');
+      toast.error('Label is required');
       return;
     }
 
     const normalizedSlug = generateSlug(newCategory.slug || newCategory.label);
     if (!isValidSlug(normalizedSlug)) {
       const errorMsg = getSlugErrorMessage(normalizedSlug);
-      alert(errorMsg || 'Invalid slug format');
+      toast.error(errorMsg || 'Invalid slug format');
       return;
     }
 
@@ -65,33 +84,48 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
         setHeaders([...headers, data.header]);
         setNewCategory({ label: "", slug: "", parentId: null });
         setIsAddingNew(false);
+        toast.success('Category created successfully!');
       } else {
         const errorData = await response.json();
-        alert(errorData.error || 'Failed to create category');
+        toast.error(errorData.error || 'Failed to create category');
       }
     } catch (error) {
       console.error('Failed to create category:', error);
-      alert('Failed to create category');
+      toast.error('Failed to create category');
     } finally {
       setCreating(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this category?')) return;
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Category",
+      message: "Are you sure you want to delete this category?",
+      variant: "danger",
+      isLoading: false,
+      onConfirm: async () => {
+        setConfirmModal((prev) => ({ ...prev, isLoading: true }));
+        try {
+          const response = await fetch(`/api/nav-headers/${id}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`/api/nav-headers/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setHeaders(headers.filter(h => h.id !== id));
-      }
-    } catch (error) {
-      console.error('Failed to delete category:', error);
-      alert('Failed to delete category');
-    }
+          if (response.ok) {
+            setHeaders(headers.filter(h => h.id !== id));
+            toast.success('Category deleted successfully!');
+            setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+          } else {
+            toast.error('Failed to delete category');
+            setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+          }
+        } catch (error) {
+          console.error('Failed to delete category:', error);
+          toast.error('Failed to delete category');
+          setConfirmModal((prev) => ({ ...prev, isLoading: false }));
+        }
+      },
+    });
   };
 
   const renderHeader = (header: NavHeader, level = 0) => {
@@ -141,7 +175,7 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
         <div className="mb-6">
           <Breadcrumb
             items={[
-              { label: "Dashboard", href: "/dashboard" },
+              { label: "Dashboard", href: "/cms" },
               { label: "Categories" },
             ]}
           />
@@ -279,6 +313,17 @@ export function CategoryManagement({ user, initialHeaders }: CategoryManagementP
           </ul>
         </div>
       </div>
+      
+      {/* Confirm Modal */}
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        isLoading={confirmModal.isLoading}
+      />
     </div>
   );
 }

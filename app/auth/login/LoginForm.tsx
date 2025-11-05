@@ -18,13 +18,13 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   // Validate callbackUrl to prevent redirecting to non-existent routes
-  const rawCallbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
-  // Only allow dashboard routes as callback URLs for security
+  const rawCallbackUrl = searchParams?.get("callbackUrl") || "/cms";
+  // Only allow cms routes as callback URLs for security
   const callbackUrl =
-    rawCallbackUrl.startsWith("/dashboard") &&
-    !rawCallbackUrl.includes("/dashboard/all-courses")
+    rawCallbackUrl.startsWith("/cms") &&
+    !rawCallbackUrl.includes("/cms/all-courses")
       ? rawCallbackUrl
-      : "/dashboard";
+      : "/cms";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,9 +56,9 @@ export default function LoginForm() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <div className="w-16 h-16 bg-[#1A7A4A] rounded-2xl flex items-center justify-center mx-auto mb-4">
             <svg
-              className="w-8 h-8 text-primary-foreground"
+              className="w-8 h-8 text-white"
               fill="currentColor"
               viewBox="0 0 24 24"
             >

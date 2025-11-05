@@ -19,7 +19,7 @@ export function Breadcrumb({ items, showHome = true }: BreadcrumbProps) {
       {showHome && (
         <>
           <Link
-            href="/dashboard"
+            href="/cms"
             className="text-muted-foreground hover:text-foreground transition-colors flex items-center"
           >
             <Home className="w-4 h-4" />

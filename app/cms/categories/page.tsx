@@ -20,7 +20,7 @@ export default async function CategoriesPage() {
 
   // Only admins and editors can manage categories
   if (profile.role === "viewer") {
-    redirect("/dashboard");
+    redirect("/cms");
   }
 
   // Note: Categories (navHeaders) now belong to Docs, not Users

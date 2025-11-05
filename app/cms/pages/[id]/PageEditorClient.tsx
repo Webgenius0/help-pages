@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAutosave } from "@/hooks/useAutosave";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
+import toast from "react-hot-toast";
 
 interface NavHeader {
   id: string;
@@ -224,17 +225,17 @@ export default function PageEditorClient({
       }
 
       if (statusToSave === "published") {
-        alert("Page published successfully!");
+        toast.success("Page published successfully!");
         // Refresh to show published state
         router.refresh();
       } else {
-        alert("Page saved successfully!");
+        toast.success("Page saved successfully!");
       }
     } catch (err: any) {
       const errorMessage = err.message || "Failed to save page";
       setError(errorMessage);
       console.error("Save error:", err);
-      alert(`Error: ${errorMessage}`);
+      toast.error(`Error: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -247,48 +248,56 @@ export default function PageEditorClient({
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
+      <header className="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0 py-3 sm:py-0 sm:h-16">
+            <div className="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
               <Link
-                href="/dashboard"
-                className="flex items-center space-x-2 text-foreground hover:text-primary transition-colors"
+                href="/cms"
+                className="flex items-center space-x-1 sm:space-x-2 text-foreground hover:text-primary transition-colors shrink-0"
               >
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center">
                   <svg
-                    className="w-5 h-5 text-primary-foreground"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                   </svg>
                 </div>
-                <span className="font-semibold">HelpPages</span>
+                <span className="font-semibold text-sm sm:text-base">
+                  HelpPages
+                </span>
               </Link>
-              <span className="text-muted-foreground">/</span>
+              <span className="text-muted-foreground text-xs sm:text-sm hidden sm:inline">
+                /
+              </span>
               <Link
-                href="/dashboard"
-                className="text-muted-foreground hover:text-primary transition-colors"
+                href="/cms"
+                className="text-xs sm:text-sm text-muted-foreground hover:text-primary transition-colors hidden sm:inline"
               >
                 Dashboard
               </Link>
-              <span className="text-muted-foreground">/</span>
-              <span className="text-foreground font-medium">{page.title}</span>
+              <span className="text-muted-foreground text-xs sm:text-sm hidden sm:inline">
+                /
+              </span>
+              <span className="text-xs sm:text-sm text-foreground font-medium truncate">
+                {page.title}
+              </span>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-wrap sm:flex-nowrap">
               {/* Autosave status */}
-              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              <div className="hidden md:flex items-center space-x-2 text-xs sm:text-sm text-muted-foreground">
                 {isAutosaving && (
                   <>
-                    <Clock className="w-4 h-4 animate-pulse" />
+                    <Clock className="w-3 h-3 sm:w-4 sm:h-4 animate-pulse" />
                     <span>Saving...</span>
                   </>
                 )}
                 {!isAutosaving && lastSaved && !autosaveError && (
                   <>
-                    <Check className="w-4 h-4 text-primary" />
+                    <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                     <span>
                       Saved {new Date(lastSaved).toLocaleTimeString()}
                     </span>
@@ -296,7 +305,7 @@ export default function PageEditorClient({
                 )}
                 {autosaveError && (
                   <>
-                    <AlertCircle className="w-4 h-4 text-destructive" />
+                    <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-destructive" />
                     <span className="text-destructive">Autosave failed</span>
                   </>
                 )}
@@ -307,7 +316,7 @@ export default function PageEditorClient({
                 <button
                   type="button"
                   onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                  className={`flex items-center space-x-2 px-3 py-2 border rounded-lg bg-input text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${
+                  className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 border rounded-lg bg-input text-foreground text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${
                     status === "published"
                       ? "border-primary/50 bg-primary/5"
                       : "border-border hover:border-primary/30"
@@ -315,17 +324,20 @@ export default function PageEditorClient({
                 >
                   {status === "published" ? (
                     <>
-                      <Globe className="w-4 h-4 text-primary" />
-                      <span className="font-medium">Published</span>
+                      <Globe className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                      <span className="font-medium hidden sm:inline">
+                        Published
+                      </span>
+                      <span className="font-medium sm:hidden">Pub</span>
                     </>
                   ) : (
                     <>
-                      <FileText className="w-4 h-4 text-muted-foreground" />
+                      <FileText className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
                       <span>Draft</span>
                     </>
                   )}
                   <ChevronDown
-                    className={`w-4 h-4 transition-transform ${
+                    className={`w-3 h-3 sm:w-4 sm:h-4 transition-transform ${
                       statusDropdownOpen ? "rotate-180" : ""
                     }`}
                   />
@@ -339,28 +351,30 @@ export default function PageEditorClient({
                       onClick={() => setStatusDropdownOpen(false)}
                     />
                     {/* Dropdown Menu */}
-                    <div className="absolute right-0 mt-2 w-48 bg-background border border-border rounded-lg shadow-lg z-20 overflow-hidden">
+                    <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-background border border-border rounded-lg shadow-lg z-20 overflow-hidden">
                       <button
                         type="button"
                         onClick={() => {
                           setStatus("draft");
                           setStatusDropdownOpen(false);
                         }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors ${
+                        className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2 sm:py-3 text-left transition-colors ${
                           status === "draft"
                             ? "bg-primary/10 text-primary"
                             : "hover:bg-accent text-foreground"
                         }`}
                       >
-                        <FileText className="w-4 h-4" />
+                        <FileText className="w-3 h-3 sm:w-4 sm:h-4" />
                         <div className="flex-1">
-                          <div className="font-medium">Draft</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm sm:text-base font-medium">
+                            Draft
+                          </div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">
                             Not visible to public
                           </div>
                         </div>
                         {status === "draft" && (
-                          <Check className="w-4 h-4 text-primary" />
+                          <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                         )}
                       </button>
                       <div className="border-t border-border" />
@@ -370,21 +384,23 @@ export default function PageEditorClient({
                           setStatus("published");
                           setStatusDropdownOpen(false);
                         }}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 text-left transition-colors ${
+                        className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2 sm:py-3 text-left transition-colors ${
                           status === "published"
                             ? "bg-primary/10 text-primary"
                             : "hover:bg-accent text-foreground"
                         }`}
                       >
-                        <Globe className="w-4 h-4" />
+                        <Globe className="w-3 h-3 sm:w-4 sm:h-4" />
                         <div className="flex-1">
-                          <div className="font-medium">Published</div>
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm sm:text-base font-medium">
+                            Published
+                          </div>
+                          <div className="text-xs text-muted-foreground hidden sm:block">
                             Visible to everyone
                           </div>
                         </div>
                         {status === "published" && (
-                          <Check className="w-4 h-4 text-primary" />
+                          <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                         )}
                       </button>
                     </div>
@@ -394,34 +410,44 @@ export default function PageEditorClient({
 
               <button
                 onClick={() => setShowPreview(!showPreview)}
-                className="btn-secondary flex items-center space-x-2"
+                className="btn-secondary flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
               >
-                <Eye size={16} />
-                <span>{showPreview ? "Edit" : "Preview"}</span>
+                <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">
+                  {showPreview ? "Edit" : "Preview"}
+                </span>
+                <span className="sm:hidden">
+                  {showPreview ? "Edit" : "View"}
+                </span>
               </button>
               {status === "published" ? (
                 <button
                   onClick={() => handleSave()}
                   disabled={saving}
-                  className="btn-primary flex items-center space-x-2"
+                  className="btn-primary flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
                 >
                   {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
                   ) : (
-                    <Save size={16} />
+                    <Save className="w-3 h-3 sm:w-4 sm:h-4" />
                   )}
-                  <span>{saving ? "Saving..." : "Save Changes"}</span>
+                  <span className="hidden sm:inline">
+                    {saving ? "Saving..." : "Save Changes"}
+                  </span>
+                  <span className="sm:hidden">
+                    {saving ? "Saving..." : "Save"}
+                  </span>
                 </button>
               ) : (
                 <button
                   onClick={handlePublish}
                   disabled={saving}
-                  className="btn-primary flex items-center space-x-2"
+                  className="btn-primary flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
                 >
                   {saving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
                   ) : (
-                    <Save size={16} />
+                    <Save className="w-3 h-3 sm:w-4 sm:h-4" />
                   )}
                   <span>{saving ? "Publishing..." : "Publish"}</span>
                 </button>
@@ -433,29 +459,29 @@ export default function PageEditorClient({
 
       {/* Error Message */}
       {error && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4">
-          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-4 py-3 rounded-lg">
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 pt-3 sm:pt-4">
+          <div className="bg-destructive/10 border border-destructive/20 text-destructive px-3 sm:px-4 py-2 sm:py-3 rounded-lg text-sm sm:text-base">
             {error}
           </div>
         </div>
       )}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <main className="px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
           {/* Editor */}
           <div className={showPreview ? "hidden lg:block" : ""}>
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="card">
-                <div className="card-content">
-                  <h2 className="text-xl font-semibold text-foreground mb-6">
+                <div className="card-content p-4 sm:p-6">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-4 sm:mb-6">
                     Page Settings
                   </h2>
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <div>
                       <label
                         htmlFor="title"
-                        className="block text-sm font-medium text-foreground mb-2"
+                        className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
                       >
                         Page Title
                       </label>
@@ -472,7 +498,7 @@ export default function PageEditorClient({
                             setSlug(autoSlug);
                           }
                         }}
-                        className="w-full h-12 px-4 text-base border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                        className="w-full h-10 sm:h-12 px-3 sm:px-4 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                         placeholder="Page Title"
                       />
                     </div>
@@ -480,7 +506,7 @@ export default function PageEditorClient({
                     <div>
                       <label
                         htmlFor="slug"
-                        className="block text-sm font-medium text-foreground mb-2"
+                        className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
                       >
                         URL Slug
                       </label>
@@ -489,7 +515,7 @@ export default function PageEditorClient({
                         type="text"
                         value={slug}
                         onChange={(e) => setSlug(generateSlug(e.target.value))}
-                        className={`w-full h-12 px-4 border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 transition-colors font-mono text-sm ${
+                        className={`w-full h-10 sm:h-12 px-3 sm:px-4 border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 transition-colors font-mono text-xs sm:text-sm ${
                           slug && !isValidSlug(slug)
                             ? "border-destructive focus:ring-destructive"
                             : "border-border focus:ring-primary"
@@ -509,7 +535,7 @@ export default function PageEditorClient({
                     <div>
                       <label
                         htmlFor="summary"
-                        className="block text-sm font-medium text-foreground mb-2"
+                        className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
                       >
                         Summary (optional)
                       </label>
@@ -518,7 +544,7 @@ export default function PageEditorClient({
                         type="text"
                         value={summary}
                         onChange={(e) => setSummary(e.target.value)}
-                        className="w-full h-12 px-4 text-base border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
+                        className="w-full h-10 sm:h-12 px-3 sm:px-4 text-sm sm:text-base border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-colors"
                         placeholder="Brief summary of this page"
                       />
                     </div>
@@ -527,19 +553,19 @@ export default function PageEditorClient({
               </div>
 
               <div className="card">
-                <div className="card-content">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-semibold text-foreground">
+                <div className="card-content p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-4 sm:mb-6">
+                    <h2 className="text-lg sm:text-xl font-semibold text-foreground">
                       Content
                     </h2>
-                    <div className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-md">
+                    <div className="text-xs text-muted-foreground bg-muted px-2 sm:px-3 py-1 rounded-md">
                       📝 Write in Markdown format
                     </div>
                   </div>
                   <div>
                     <label
                       htmlFor="content"
-                      className="block text-sm font-medium text-foreground mb-2"
+                      className="block text-xs sm:text-sm font-medium text-foreground mb-1.5 sm:mb-2"
                     >
                       Your page content (Markdown supported)
                     </label>
@@ -547,8 +573,8 @@ export default function PageEditorClient({
                       id="content"
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      rows={24}
-                      className="w-full px-4 py-3 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm resize-none"
+                      rows={16}
+                      className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-xs sm:text-sm resize-none min-h-[300px] sm:min-h-[400px]"
                       placeholder="# Start writing your documentation here...
 
 Use markdown to format your content:
@@ -581,20 +607,22 @@ code blocks
 
           {/* Preview */}
           <div className={showPreview ? "block" : "hidden lg:block"}>
-            <div className="sticky top-24">
+            <div className="sticky top-20 sm:top-24">
               <div className="card">
-                <div className="card-content">
-                  <h3 className="text-lg font-semibold text-foreground mb-6">
+                <div className="card-content p-4 sm:p-6">
+                  <h3 className="text-base sm:text-lg font-semibold text-foreground mb-4 sm:mb-6">
                     Preview
                   </h3>
-                  <div className="prose prose-lg dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-3xl prose-h2:text-2xl prose-h3:text-xl prose-h4:text-lg prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-pre:bg-muted prose-pre:border prose-pre:border-border">
-                    <h1>{title}</h1>
+                  <div className="prose prose-sm sm:prose-base md:prose-lg dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-2xl sm:prose-h1:text-3xl prose-h2:text-xl sm:prose-h2:text-2xl prose-h3:text-lg sm:prose-h3:text-xl prose-h4:text-base sm:prose-h4:text-lg prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs sm:prose-code:text-sm prose-pre:bg-muted prose-pre:border prose-pre:border-border">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl">{title}</h1>
                     {summary && (
-                      <div className="text-lg text-muted-foreground mb-6 p-4 bg-muted/50 rounded-lg border border-border">
+                      <div className="text-sm sm:text-base md:text-lg text-muted-foreground mb-4 sm:mb-6 p-3 sm:p-4 bg-muted/50 rounded-lg border border-border">
                         {summary}
                       </div>
                     )}
-                    <div className="mt-4">{renderMarkdownPreview(content)}</div>
+                    <div className="mt-3 sm:mt-4">
+                      {renderMarkdownPreview(content)}
+                    </div>
                   </div>
                 </div>
               </div>

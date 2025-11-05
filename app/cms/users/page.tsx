@@ -19,7 +19,7 @@ export default async function UsersManagementPage() {
 
   // Only admins can access user management
   if (profile.role !== "admin") {
-    redirect("/dashboard");
+    redirect("/cms");
   }
 
   return <UsersManagementClient />;

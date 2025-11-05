@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const query = searchParams.get("q");
     const limit = parseInt(searchParams.get("limit") || "20");
     const includePrivate = searchParams.get("includePrivate") === "true";
+    const docSlug = searchParams.get("docSlug"); // Filter by specific doc if provided
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json({ results: [], query: "" });
@@ -43,13 +44,25 @@ export async function GET(request: NextRequest) {
       ],
     };
 
+    // Filter by doc slug if provided
+    if (docSlug) {
+      whereClause.doc = {
+        slug: docSlug,
+        ...(whereClause.doc || {}),
+      };
+    }
+
     // If user is not logged in or doesn't want private pages, only show public pages
     // Pages inherit visibility from their parent Doc
     if (!session?.user || !includePrivate) {
       whereClause.status = "published";
-      whereClause.doc = {
-        isPublic: true,
-      };
+      if (whereClause.doc) {
+        whereClause.doc.isPublic = true;
+      } else {
+        whereClause.doc = {
+          isPublic: true,
+        };
+      }
     } else if (session?.user?.email) {
       // Show published pages or user's own drafts
       const user = await prisma.user.findUnique({
@@ -77,6 +90,8 @@ export async function GET(request: NextRequest) {
         docId: true,
         doc: {
           select: {
+            id: true,
+            slug: true,
             isPublic: true,
           },
         },
@@ -107,6 +122,8 @@ export async function GET(request: NextRequest) {
       updatedAt: Date;
       docId: string | null;
       doc: {
+        id: string;
+        slug: string;
         isPublic: boolean;
       } | null;
       user: {
@@ -119,13 +136,23 @@ export async function GET(request: NextRequest) {
       } | null;
     }>;
 
+    // Build navHeaders where clause
+    const navHeaderWhere: any = {
+      OR: [
+        { label: { contains: query, mode: "insensitive" } },
+        { slug: { contains: query, mode: "insensitive" } },
+      ],
+    };
+
+    // Filter by doc slug if provided
+    if (docSlug) {
+      navHeaderWhere.doc = {
+        slug: docSlug,
+      };
+    }
+
     const navHeaders = await prisma.navHeader.findMany({
-      where: {
-        OR: [
-          { label: { contains: query, mode: "insensitive" } },
-          { slug: { contains: query, mode: "insensitive" } },
-        ],
-      },
+      where: navHeaderWhere,
       select: {
         id: true,
         label: true,
@@ -134,6 +161,12 @@ export async function GET(request: NextRequest) {
         parent: {
           select: {
             label: true,
+            slug: true,
+          },
+        },
+        doc: {
+          select: {
+            id: true,
             slug: true,
           },
         },
@@ -148,6 +181,14 @@ export async function GET(request: NextRequest) {
         ? getHighlightedExcerpt(page.summary, query, 100)
         : null;
 
+      // Generate URL based on doc structure
+      // If docSlug is provided or doc exists, use /docs/{docSlug}/{pageSlug}
+      // Otherwise fall back to /u/{username}/{slug} for backward compatibility
+      const docSlugForUrl = page.doc?.slug || docSlug;
+      const url = docSlugForUrl
+        ? `/docs/${docSlugForUrl}/${page.slug}`
+        : `/u/${page.user.username}/${page.slug}`;
+
       return {
         id: page.id,
         title: highlightText(page.title, query),
@@ -159,7 +200,7 @@ export async function GET(request: NextRequest) {
         updatedAt: page.updatedAt,
         author: page.user.fullName || page.user.username,
         category: page.navHeader?.label || "Uncategorized",
-        url: `/u/${page.user.username}/${page.slug}`,
+        url: url,
       };
     });
 
@@ -173,14 +214,27 @@ export async function GET(request: NextRequest) {
           label: string;
           slug: string;
         } | null;
-      }) => ({
-        id: header.id,
-        title: highlightText(header.label, query),
-        slug: header.slug,
-        type: "category",
-        parent: header.parent?.label,
-        url: `/dashboard/pages?header=${header.id}`,
-      })
+        doc: {
+          id: string;
+          slug: string;
+        } | null;
+      }) => {
+        // Generate URL for navHeader - if docSlug exists, link to docs page
+        // Otherwise link to CMS pages
+        const docSlugForUrl = header.doc?.slug || docSlug;
+        const url = docSlugForUrl
+          ? `/docs/${docSlugForUrl}`
+          : `/cms/pages?header=${header.id}`;
+
+        return {
+          id: header.id,
+          title: highlightText(header.label, query),
+          slug: header.slug,
+          type: "category",
+          parent: header.parent?.label,
+          url: url,
+        };
+      }
     );
 
     return NextResponse.json({

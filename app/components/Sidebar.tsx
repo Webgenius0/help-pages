@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Plus,
   Edit3,
+  X,
 } from "lucide-react";
 
 interface NavItem {
@@ -42,7 +43,12 @@ interface PublicPage {
   };
 }
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+}
+
+export function Sidebar({ isOpen = false, onClose }: SidebarProps = {}) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -56,8 +62,8 @@ export function Sidebar() {
     return null;
   }
 
-  // Determine if we're in CMS mode (dashboard routes) or public docs mode
-  const isCMSMode = pathname?.startsWith("/dashboard");
+  // Determine if we're in CMS mode (cms routes) or public docs mode
+  const isCMSMode = pathname?.startsWith("/cms");
 
   // Load user role
   useEffect(() => {
@@ -116,7 +122,7 @@ export function Sidebar() {
     {
       id: "dashboard",
       label: "Dashboard",
-      href: "/dashboard",
+      href: "/cms",
       icon: Home,
     },
     // Removed "Pages" item - dashboard already shows all pages and categories
@@ -126,7 +132,7 @@ export function Sidebar() {
           {
             id: "users",
             label: "User Management",
-            href: "/dashboard/users",
+            href: "/cms/users",
             icon: Users,
           },
         ]
@@ -134,7 +140,7 @@ export function Sidebar() {
     {
       id: "settings",
       label: "Settings",
-      href: "/dashboard/settings",
+      href: "/cms/settings",
       icon: Settings,
     },
   ];
@@ -208,16 +214,16 @@ export function Sidebar() {
     const pathnameWithoutQuery = pathname.split("?")[0];
     const hrefWithoutQuery = href.split("?")[0];
 
-    // Special case: If we're on /dashboard, only mark "Dashboard" as active
+    // Special case: If we're on /cms, only mark "Dashboard" as active
     // Don't mark "Pages" or any of its children as active
-    if (pathnameWithoutQuery === "/dashboard") {
+    if (pathnameWithoutQuery === "/cms") {
       return item.id === "dashboard";
     }
 
     // For exact matches, check if it's actually this item
     if (pathnameWithoutQuery === hrefWithoutQuery || pathname === href) {
-      // Don't mark "Pages" as active if we're on /dashboard
-      if (pathnameWithoutQuery === "/dashboard" && item.id !== "dashboard") {
+      // Don't mark "Pages" as active if we're on /cms
+      if (pathnameWithoutQuery === "/cms" && item.id !== "dashboard") {
         return false;
       }
       return true;
@@ -225,8 +231,8 @@ export function Sidebar() {
 
     // If this item has children, check if any child is active
     if (item.children && item.children.length > 0) {
-      // Special case: Don't check children if we're on /dashboard
-      if (pathnameWithoutQuery === "/dashboard") {
+      // Special case: Don't check children if we're on /cms
+      if (pathnameWithoutQuery === "/cms") {
         return false;
       }
 
@@ -240,14 +246,14 @@ export function Sidebar() {
       });
 
       // If a child is active, parent should be active too (for visual hierarchy)
-      // But only if we're not on /dashboard
+      // But only if we're not on /cms
       if (anyChildActive) {
         return true;
       }
     }
 
     // For items without children, don't match subpaths
-    // This prevents /dashboard from being active when on /dashboard/settings
+    // This prevents /cms from being active when on /cms/settings
     return false;
   };
 
@@ -264,14 +270,15 @@ export function Sidebar() {
           <Link
             href={item.href}
             prefetch={true}
-            className={`flex items-center flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex items-center flex-1 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-colors ${
               active
-                ? "bg-primary text-primary-foreground"
+                ? "bg-[#1A7A4A] text-white"
                 : "text-foreground hover:bg-accent hover:text-accent-foreground"
             }`}
-            style={{ paddingLeft: `${12 + level * 16}px` }}
+            style={{ paddingLeft: `${8 + level * 12}px` }}
+            onClick={onClose}
           >
-            <item.icon className="w-4 h-4 mr-3 shrink-0" />
+            <item.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 sm:mr-3 shrink-0" />
             <span className="truncate">{item.label}</span>
           </Link>
 
@@ -305,11 +312,39 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="docs-sidebar">
+    <aside
+      className={`fixed lg:static inset-y-0 left-0 z-60 lg:z-auto w-72 sm:w-80 border-r border-sidebar-border bg-sidebar shrink-0 h-screen overflow-y-auto transform transition-transform duration-300 ease-in-out ${
+        isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      }`}
+    >
       <div className="flex flex-col h-full">
         {/* Sidebar Header */}
-        <div className="p-6 border-b border-sidebar-border">
-          <div className="flex items-center space-x-3">
+        <div className="p-4 sm:p-6 border-b border-sidebar-border">
+          {/* Mobile Close Button */}
+          <div className="lg:hidden flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg text-sidebar-foreground">
+                  HelpPages
+                </h2>
+                <p className="text-xs text-sidebar-foreground/70">
+                  {isCMSMode ? "CMS Dashboard" : "Documentation"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-accent rounded-md transition-colors ml-2"
+              aria-label="Close sidebar"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          {/* Desktop Header */}
+          <div className="hidden lg:flex items-center space-x-3">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <BookOpen className="w-5 h-5 text-primary-foreground" />
             </div>
@@ -326,20 +361,21 @@ export function Sidebar() {
 
         {/* Quick Actions - Only in CMS mode for admin/editors */}
         {isCMSMode && (userRole === "admin" || userRole === "editor") && (
-          <div className="p-4 border-b border-sidebar-border">
+          <div className="p-3 sm:p-4 border-b border-sidebar-border">
             <Link
-              href="/dashboard/pages/new"
+              href="/cms/pages/new"
               prefetch={true}
-              className="btn-primary w-full flex items-center justify-center space-x-2 text-sm"
+              onClick={onClose}
+              className="btn-primary w-full flex items-center justify-center space-x-2 text-xs sm:text-sm py-2 sm:py-2.5"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>New Page</span>
             </Link>
           </div>
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-1 p-3 sm:p-4 space-y-1 sm:space-y-2 overflow-y-auto">
           {navItems.length > 0 ? (
             navItems.map((item) => renderNavItem(item))
           ) : (
@@ -352,14 +388,6 @@ export function Sidebar() {
             </div>
           )}
         </nav>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="text-xs text-sidebar-foreground/70">
-            <p>HelpPages v1.0</p>
-            <p>Built with Next.js</p>
-          </div>
-        </div>
       </div>
     </aside>
   );

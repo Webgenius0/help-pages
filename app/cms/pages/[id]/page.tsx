@@ -39,7 +39,7 @@ export default async function PageEditorPage({
   });
 
   if (!page) {
-    redirect("/dashboard");
+    redirect("/cms");
   }
 
   // Check permissions: owner, admin, or editor can access
@@ -49,7 +49,7 @@ export default async function PageEditorPage({
   const isEditor = profile.role === "editor";
 
   if (!isOwner && !isAdmin && !isEditor) {
-    redirect("/dashboard");
+    redirect("/cms");
   }
 
   return <PageEditorClient page={page} />;

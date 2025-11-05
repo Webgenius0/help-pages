@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Download, FileText, Code, FileType } from "lucide-react";
+import toast from "react-hot-toast";
 
 interface ExportButtonProps {
   pageId: string;
@@ -36,9 +37,10 @@ export function ExportButton({ pageId, pageName }: ExportButtonProps) {
       document.body.removeChild(a);
 
       setIsOpen(false);
+      toast.success(`Exported as ${format.toUpperCase()} successfully!`);
     } catch (error) {
       console.error("Export error:", error);
-      alert(`Failed to export: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(`Failed to export: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setExporting(false);
     }
