@@ -18,12 +18,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // Admins and editors can see all docs (for collaboration)
-    // Viewers (non-logged-in) only see public docs
-    const whereClause =
-      profile.role === "admin" || profile.role === "editor"
-        ? {} // No filter - see all docs
-        : { userId: profile.id }; // Regular users only see their own
+    // Each admin only sees their own docs
+    // Editors can see docs they have access to (currently all docs of their admin)
+    const whereClause: any = {};
+
+    if (profile.role === "admin") {
+      // Admins see only their own docs
+      whereClause.userId = profile.id;
+    } else if (profile.role === "editor") {
+      // Editors see docs created by the admin who created them
+      // First, find who created this editor
+      try {
+        const profileWithCreatedBy = profile as any;
+        if (profileWithCreatedBy.createdBy) {
+          const editorCreator = await prisma.user.findUnique({
+            where: { id: profileWithCreatedBy.createdBy },
+            select: { id: true },
+          });
+
+          if (editorCreator) {
+            // Show docs created by their admin
+            whereClause.userId = editorCreator.id;
+          } else {
+            // If no creator found, show no docs
+            whereClause.userId = "no-match";
+          }
+        } else {
+          // Legacy editor without createdBy - show no docs for now
+          whereClause.userId = "no-match";
+        }
+      } catch (error: any) {
+        // If createdBy column doesn't exist yet, show no docs
+        console.warn("Error checking editor creator:", error.message);
+        whereClause.userId = "no-match";
+      }
+    } else {
+      // Other users only see their own docs
+      whereClause.userId = profile.id;
+    }
 
     const docs = await (prisma as any).doc.findMany({
       where: whereClause,

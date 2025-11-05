@@ -48,11 +48,32 @@ export const authOptions: NextAuthOptions = {
             return null;
           }
 
-          const user = await prisma.user.findUnique({
-            where: {
-              email: credentials.email,
-            },
-          });
+          let user: any = null;
+          
+          try {
+            user = await prisma.user.findUnique({
+              where: {
+                email: credentials.email,
+              },
+            });
+          } catch (findError: any) {
+            // If createdBy column doesn't exist yet, use raw SQL query
+            if (findError.message?.includes("created_by") || findError.message?.includes("does not exist")) {
+              const users = await (prisma as any).$queryRaw`
+                SELECT id, email, username, password, full_name as "fullName"
+                FROM users 
+                WHERE email = ${credentials.email}
+                LIMIT 1
+              `;
+              
+              if (users.length > 0) {
+                user = users[0];
+              }
+            } else {
+              // Re-throw other errors
+              throw findError;
+            }
+          }
 
           if (!user || !user.password) {
             return null;

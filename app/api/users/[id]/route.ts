@@ -102,6 +102,26 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // If admin is trying to update another user, check if they created that user
+    if (isAdmin && !isOwnProfile) {
+      const targetUser = await prisma.user.findUnique({
+        where: { id },
+        select: { createdBy: true },
+      });
+
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
+
+      // Only allow updating users created by this admin
+      if (targetUser.createdBy !== profile.id) {
+        return NextResponse.json(
+          { error: "Forbidden: You can only update users you created" },
+          { status: 403 }
+        );
+      }
+    }
+
     // Only admins can change roles
     if (role && !isAdmin) {
       return NextResponse.json(
@@ -233,6 +253,24 @@ export async function DELETE(
       return NextResponse.json(
         { error: "Cannot delete your own account" },
         { status: 400 }
+      );
+    }
+
+    // Check if the user was created by this admin
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { createdBy: true },
+    });
+
+    if (!targetUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Only allow deleting users created by this admin
+    if (targetUser.createdBy !== profile.id) {
+      return NextResponse.json(
+        { error: "Forbidden: You can only delete users you created" },
+        { status: 403 }
       );
     }
 
