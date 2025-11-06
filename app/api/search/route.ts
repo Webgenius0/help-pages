@@ -34,46 +34,104 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Build the search conditions (content matching)
+    const searchConditions = [
+      { title: { contains: query, mode: "insensitive" } },
+      { content: { contains: query, mode: "insensitive" } },
+      { summary: { contains: query, mode: "insensitive" } },
+      { searchIndex: { contains: query, mode: "insensitive" } },
+    ];
+
     // Build the where clause based on permissions
     const whereClause: any = {
-      OR: [
-        { title: { contains: query, mode: "insensitive" } },
-        { content: { contains: query, mode: "insensitive" } },
-        { summary: { contains: query, mode: "insensitive" } },
-        { searchIndex: { contains: query, mode: "insensitive" } },
+      AND: [
+        {
+          OR: searchConditions,
+        },
       ],
     };
 
     // Filter by doc slug if provided
     if (docSlug) {
-      whereClause.doc = {
-        slug: docSlug,
-        ...(whereClause.doc || {}),
-      };
+      whereClause.AND.push({
+        doc: {
+          slug: docSlug,
+        },
+      });
     }
 
-    // If user is not logged in or doesn't want private pages, only show public pages
-    // Pages inherit visibility from their parent Doc
+    // Handle permissions and visibility
     if (!session?.user || !includePrivate) {
-      whereClause.status = "published";
-      if (whereClause.doc) {
-        whereClause.doc.isPublic = true;
+      // Public search: only published pages in public docs
+      whereClause.AND.push({
+        status: "published",
+      });
+      
+      if (docSlug) {
+        // If filtering by doc, ensure it's public
+        const docIndex = whereClause.AND.findIndex((clause: any) => clause.doc);
+        if (docIndex >= 0) {
+          whereClause.AND[docIndex].doc.isPublic = true;
+        }
       } else {
-        whereClause.doc = {
-          isPublic: true,
-        };
+        whereClause.AND.push({
+          doc: {
+            isPublic: true,
+          },
+        });
       }
     } else if (session?.user?.email) {
-      // Show published pages or user's own drafts
+      // Logged in user: show their own pages (any status) + published pages from docs they can access
       const user = await prisma.user.findUnique({
         where: { email: session.user.email },
       });
 
       if (user) {
-        whereClause.OR.push(
-          { status: "published" },
-          { AND: [{ userId: user.id }, { status: "draft" }] }
-        );
+        // User can see:
+        // 1. Their own pages (drafts and published)
+        // 2. Published pages from docs they own or are editors of
+        // 3. Published pages from public docs
+        
+        const userDocIds = await prisma.doc.findMany({
+          where: {
+            userId: user.id,
+          },
+          select: { id: true },
+        });
+        
+        const userDocIdArray = userDocIds.map((d) => d.id);
+        
+        // Build OR conditions for what user can see
+        const visibilityConditions: any[] = [
+          // User's own pages (drafts and published)
+          { userId: user.id },
+        ];
+        
+        // Add pages from docs they own (if they have any docs)
+        if (userDocIdArray.length > 0) {
+          visibilityConditions.push({
+            AND: [
+              { status: "published" },
+              { docId: { in: userDocIdArray } },
+            ],
+          });
+        }
+        
+        // Add published pages from public docs
+        visibilityConditions.push({
+          AND: [
+            { status: "published" },
+            {
+              doc: {
+                isPublic: true,
+              },
+            },
+          ],
+        });
+        
+        whereClause.AND.push({
+          OR: visibilityConditions,
+        });
       }
     }
 
@@ -181,13 +239,21 @@ export async function GET(request: NextRequest) {
         ? getHighlightedExcerpt(page.summary, query, 100)
         : null;
 
-      // Generate URL based on doc structure
-      // If docSlug is provided or doc exists, use /docs/{docSlug}/{pageSlug}
-      // Otherwise fall back to /u/{username}/{slug} for backward compatibility
+      // Generate URL based on context
+      // In CMS (includePrivate=true), link to CMS editor
+      // Otherwise, link to public docs view
       const docSlugForUrl = page.doc?.slug || docSlug;
-      const url = docSlugForUrl
-        ? `/docs/${docSlugForUrl}/${page.slug}`
-        : `/u/${page.user.username}/${page.slug}`;
+      let url: string;
+      
+      if (includePrivate && session?.user) {
+        // CMS context: link to page editor
+        url = `/cms/pages/${page.id}`;
+      } else {
+        // Public context: link to public docs view
+        url = docSlugForUrl
+          ? `/docs/${docSlugForUrl}/${page.slug}`
+          : `/u/${page.user.username}/${page.slug}`;
+      }
 
       return {
         id: page.id,
@@ -219,12 +285,19 @@ export async function GET(request: NextRequest) {
           slug: string;
         } | null;
       }) => {
-        // Generate URL for navHeader - if docSlug exists, link to docs page
-        // Otherwise link to CMS pages
+        // Generate URL for navHeader based on context
         const docSlugForUrl = header.doc?.slug || docSlug;
-        const url = docSlugForUrl
-          ? `/docs/${docSlugForUrl}`
-          : `/cms/pages?header=${header.id}`;
+        let url: string;
+        
+        if (includePrivate && session?.user) {
+          // CMS context: link to CMS pages list filtered by header
+          url = `/cms/pages?header=${header.id}`;
+        } else {
+          // Public context: link to public docs view
+          url = docSlugForUrl
+            ? `/docs/${docSlugForUrl}`
+            : `/cms/pages?header=${header.id}`;
+        }
 
         return {
           id: header.id,
