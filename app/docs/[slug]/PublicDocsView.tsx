@@ -313,7 +313,7 @@ function PublicDocsViewContent({
                           </button>
                           {/* Section Content - Pages and Subsections */}
                           {isSectionExpanded && (
-                            <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/40 pl-4">
+                            <div className="mt-0.5 space-y-0.5 border-l border-border/40 pl-2.5">
                               {/* Pages in section */}
                               {section.pages.length > 0 && (
                                 <>
@@ -366,7 +366,7 @@ function PublicDocsViewContent({
                                         </button>
                                         {isSubsectionExpanded &&
                                           subsection.pages.length > 0 && (
-                                            <div className="ml-3 mt-0.5 space-y-0.5 border-l border-border/30 pl-3">
+                                            <div className="mt-0.5 space-y-0.5 border-l border-border/30 pl-2.5">
                                               {subsection.pages.map((page) => (
                                                 <Link
                                                   key={page.id}
