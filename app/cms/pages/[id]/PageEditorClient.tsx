@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -48,94 +48,179 @@ export default function PageEditorClient({
   const [content, setContent] = useState(page.content);
   const [summary, setSummary] = useState(page.summary || "");
   const [status, setStatus] = useState(page.status);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
-  // Memoize autosave callback to prevent infinite loops
-  // Only autosave drafts, not published pages
+  // Removed manual save ref - using only autosave now
+
+  // Autosave callback - saves automatically when data changes
   const handleAutosave = useCallback(
     async (data: {
       title: string;
       content: string;
       summary: string;
       status: string;
-    }) => {
-      // Skip autosave if page is published (user should manually save changes to published pages)
-      if (data.status === "published") {
-        return;
+      slug?: string;
+    }): Promise<void> => {
+      console.log("[handleAutosave] 🔵 Called with data:", {
+        title: data.title?.substring(0, 50),
+        content: data.content?.substring(0, 50),
+        summary: data.summary?.substring(0, 50),
+        status: data.status,
+        pageId: page.id,
+      });
+
+      // For new pages (no ID yet), we cannot autosave
+      if (!page.id) {
+        console.log(
+          "[handleAutosave] ⚠️ Page has no ID, cannot autosave new pages yet"
+        );
+        throw new Error("AUTOSAVE_SKIPPED_NO_ID");
       }
 
-      // Ensure we have at least some data to save
-      if (!data.title && !data.content && !data.summary) {
-        console.log("Autosave skipped: no data to save");
-        return;
-      }
+      console.log("[handleAutosave] ✅ All checks passed, making API call...");
 
-      try {
-        const response = await fetch(`/api/pages/${page.id}`, {
+      // Prepare autosave data - use current values from state
+      // Use slug from data if provided, otherwise use current slug or generate from title
+      const normalizedSlug = generateSlug(
+        data.slug || slug || title || data.title || ""
+      );
+      const autosaveData = {
+        title: data.title || title,
+        slug: normalizedSlug,
+        content: data.content || content,
+        summary:
+          data.summary !== undefined ? data.summary || null : summary || null,
+        status: data.status || status || "draft",
+        isAutosave: true,
+      };
+
+      console.log(
+        "[handleAutosave] 📤 Making PUT request to:",
+        `/api/pages/${page.id}`,
+        {
+          pageId: page.id,
+          endpoint: `/api/pages/${page.id}`,
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: data.title || title,
-            content: data.content || content,
-            summary: data.summary !== undefined ? data.summary : summary,
-            slug: slug || page.slug,
-            // Keep current status, don't change it during autosave
-            status: data.status || status || "draft",
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: "Failed to parse error response" }));
-          const errorMessage =
-            errorData.error || errorData.details || "Failed to autosave";
-          console.error("Autosave failed:", errorMessage, errorData);
-          throw new Error(errorMessage);
+          hasTitle: !!autosaveData.title,
+          hasContent: !!autosaveData.content,
+          data: autosaveData,
         }
+      );
 
-        const result = await response.json();
-        // Update page state if response includes updated page
-        if (result.page) {
-          setPage(result.page);
+      // Use the exact same endpoint format as manual save
+      const response = await fetch(`/api/pages/${page.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Autosave": "true", // Mark as autosave request
+        },
+        body: JSON.stringify(autosaveData),
+      });
+
+      console.log("[handleAutosave] 📥 Response received:", {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText,
+      });
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Failed to parse error response" }));
+        const errorMessage =
+          errorData.error || errorData.details || "Failed to autosave";
+        console.error(
+          "[handleAutosave] ❌ Autosave failed:",
+          errorMessage,
+          errorData
+        );
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+      console.log("[handleAutosave] ✅ Autosave successful:", {
+        pageId: page.id,
+        updated: !!result.page,
+        result,
+      });
+
+      // Update page state if response includes updated page
+      if (result.page) {
+        setPage(result.page);
+        // Update slug if it changed
+        if (result.page.slug && result.page.slug !== slug) {
+          setSlug(result.page.slug);
         }
-        return result;
-      } catch (error: any) {
-        console.error("Autosave error details:", error);
-        throw error;
       }
     },
     [page.id, slug, title, content, summary, status, page.slug]
   );
 
-  // Autosave functionality - DISABLED for now
-  // const {
-  //   isSaving: isAutosaving,
-  //   lastSaved,
-  //   error: autosaveError,
-  // } = useAutosave(
-  //   { title, content, summary, status },
-  //   {
-  //     delay: 3000, // Auto-save after 3 seconds of inactivity
-  //     onSave: handleAutosave,
-  //     onError: (err) => {
-  //       console.error("Autosave error:", err.message || err);
-  //       // Silently fail autosave errors to avoid UI disruption
-  //       // User can manually save if needed
-  //     },
-  //   }
-  // );
+  // Memoize autosave data to ensure stable reference
+  // Only create new object when values actually change
+  // Include slug so slug changes trigger autosave
+  const autosaveData = useMemo(() => {
+    return { title, content, summary, status, slug };
+  }, [title, content, summary, status, slug]);
 
-  // Disabled autosave - manually set these values
-  const isAutosaving = false;
-  const lastSaved = null;
-  const autosaveError = null;
+  // Autosave functionality with debouncing and performance optimization
+  const {
+    isSaving: isAutosaving,
+    lastSaved,
+    error: autosaveError,
+  } = useAutosave(autosaveData, {
+    delay: 2000, // Auto-save after 2 seconds of inactivity (optimized for better UX)
+    onSave: handleAutosave,
+    onError: (err) => {
+      // Log autosave errors for debugging
+      console.error("[useAutosave] Error:", err.message || err);
+    },
+  });
 
-  // Sync local state when page prop changes (e.g., after manual save)
+  // Debug: Log when autosave state changes
   useEffect(() => {
+    console.log("[PageEditor] Autosave state:", {
+      isAutosaving,
+      lastSaved,
+      hasError: !!autosaveError,
+      error: autosaveError?.message,
+    });
+  }, [isAutosaving, lastSaved, autosaveError]);
+
+  // Debug: Log when form values change
+  useEffect(() => {
+    console.log("[PageEditor] 📝 Form values changed:", {
+      title: title.substring(0, 50),
+      slug: slug.substring(0, 50),
+      contentLength: content.length,
+      summary: summary?.substring(0, 50),
+      status,
+      pageId: page.id,
+    });
+  }, [title, slug, content, summary, status, page.id]);
+
+  // Debug: Log the autosave data object being passed to the hook
+  useEffect(() => {
+    const autosaveData = { title, content, summary, status, slug };
+    console.log("[PageEditor] 🔄 Autosave data object:", {
+      ...autosaveData,
+      title: autosaveData.title.substring(0, 50),
+      slug: autosaveData.slug?.substring(0, 50),
+      content: `[${autosaveData.content.length} chars]`,
+      summary: autosaveData.summary?.substring(0, 50),
+      status: autosaveData.status,
+    });
+  }, [title, content, summary, status, slug]);
+
+  // Sync local state when page prop changes (e.g., after page reload)
+  useEffect(() => {
+    console.log("[PageEditor] 🔄 Page changed, resetting state:", {
+      pageId: initialPage.id,
+      title: initialPage.title.substring(0, 50),
+    });
+
     setPage(initialPage);
     setTitle(initialPage.title);
     setSlug(initialPage.slug);
@@ -155,94 +240,13 @@ export default function PageEditorClient({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [statusDropdownOpen]);
 
-  const handleSave = async (publishStatus?: string) => {
-    setSaving(true);
-    setError(null);
+  // Handle status change - autosave will handle the save
+  const handleStatusChange = async (newStatus: string) => {
+    setStatus(newStatus);
+    setStatusDropdownOpen(false);
 
-    // Validate slug before saving
-    const normalizedSlug = generateSlug(slug || title);
-    if (!isValidSlug(normalizedSlug)) {
-      const errorMsg = getSlugErrorMessage(normalizedSlug);
-      setError(errorMsg || "Invalid slug format");
-      setSaving(false);
-      return;
-    }
-
-    try {
-      const statusToSave = publishStatus || status;
-
-      // If publishing, use current content as the published content
-      // Note: isPublic is removed - pages inherit visibility from their parent Doc
-      const saveData: any = {
-        title,
-        slug: normalizedSlug,
-        content,
-        summary: summary || null,
-        status: statusToSave,
-      };
-
-      // Removed draftContent - not needed for now
-
-      console.log("Saving page with data:", {
-        id: page.id,
-        saveData,
-        statusToSave,
-      });
-
-      const response = await fetch(`/api/pages/${page.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(saveData),
-      });
-
-      const data = await response.json();
-
-      console.log("Save response:", {
-        ok: response.ok,
-        status: response.status,
-        data,
-      });
-
-      if (!response.ok) {
-        const errorMsg =
-          data.error ||
-          data.details ||
-          `Failed to save page (${response.status})`;
-        console.error("Save error details:", {
-          status: response.status,
-          error: data.error,
-          details: data.details,
-          code: data.code,
-          fullResponse: data,
-        });
-        throw new Error(errorMsg);
-      }
-
-      // Update all local state from response
-      if (data.page) {
-        setPage(data.page);
-        setStatus(data.page.status);
-      }
-
-      if (statusToSave === "published") {
-        toast.success("Page published successfully!");
-        // Refresh to show published state
-        router.refresh();
-      } else {
-        toast.success("Page saved successfully!");
-      }
-    } catch (err: any) {
-      const errorMessage = err.message || "Failed to save page";
-      setError(errorMessage);
-      console.error("Save error:", err);
-      toast.error(`Error: ${errorMessage}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handlePublish = async () => {
-    await handleSave("published");
+    // Status change will trigger autosave via the useAutosave hook
+    // No manual save needed
   };
 
   return (
@@ -354,10 +358,7 @@ export default function PageEditorClient({
                     <div className="absolute right-0 mt-2 w-40 sm:w-48 bg-background border border-border rounded-lg shadow-lg z-20 overflow-hidden">
                       <button
                         type="button"
-                        onClick={() => {
-                          setStatus("draft");
-                          setStatusDropdownOpen(false);
-                        }}
+                        onClick={() => handleStatusChange("draft")}
                         className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2 sm:py-3 text-left transition-colors ${
                           status === "draft"
                             ? "bg-primary/10 text-primary"
@@ -380,10 +381,7 @@ export default function PageEditorClient({
                       <div className="border-t border-border" />
                       <button
                         type="button"
-                        onClick={() => {
-                          setStatus("published");
-                          setStatusDropdownOpen(false);
-                        }}
+                        onClick={() => handleStatusChange("published")}
                         className={`w-full flex items-center space-x-2 sm:space-x-3 px-3 sm:px-4 py-2 sm:py-3 text-left transition-colors ${
                           status === "published"
                             ? "bg-primary/10 text-primary"
@@ -420,38 +418,6 @@ export default function PageEditorClient({
                   {showPreview ? "Edit" : "View"}
                 </span>
               </button>
-              {status === "published" ? (
-                <button
-                  onClick={() => handleSave()}
-                  disabled={saving}
-                  className="btn-primary flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                >
-                  {saving ? (
-                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-3 h-3 sm:w-4 sm:h-4" />
-                  )}
-                  <span className="hidden sm:inline">
-                    {saving ? "Saving..." : "Save Changes"}
-                  </span>
-                  <span className="sm:hidden">
-                    {saving ? "Saving..." : "Save"}
-                  </span>
-                </button>
-              ) : (
-                <button
-                  onClick={handlePublish}
-                  disabled={saving}
-                  className="btn-primary flex items-center space-x-1 sm:space-x-2 text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2"
-                >
-                  {saving ? (
-                    <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
-                  ) : (
-                    <Save className="w-3 h-3 sm:w-4 sm:h-4" />
-                  )}
-                  <span>{saving ? "Publishing..." : "Publish"}</span>
-                </button>
-              )}
             </div>
           </div>
         </div>
@@ -616,7 +582,7 @@ code blocks
                   <div className="prose prose-sm sm:prose-base md:prose-lg dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:tracking-tight prose-h1:text-2xl sm:prose-h1:text-3xl prose-h2:text-xl sm:prose-h2:text-2xl prose-h3:text-lg sm:prose-h3:text-xl prose-h4:text-base sm:prose-h4:text-lg prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-xs sm:prose-code:text-sm prose-pre:bg-muted prose-pre:border prose-pre:border-border">
                     <h1 className="text-xl sm:text-2xl md:text-3xl">{title}</h1>
                     {summary && (
-                      <div className="text-sm sm:text-base md:text-lg text-muted-foreground mb-4 sm:mb-6 p-3 sm:p-4 bg-muted/50 rounded-lg border border-border">
+                      <div className="text-sm sm:text-base md:text-lg text-muted-foreground my-4 sm:mb-6 p-3 sm:p-4 bg-muted/50 rounded-lg border border-border">
                         {summary}
                       </div>
                     )}

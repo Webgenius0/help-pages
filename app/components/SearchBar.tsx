@@ -26,6 +26,11 @@ export function SearchBar() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
+  // Detect if we're in CMS context
+  const isCMS =
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith("/cms");
+
   const debouncedQuery = useDebounce(query, 300);
 
   // Perform search
@@ -34,16 +39,40 @@ export function SearchBar() {
       if (debouncedQuery.trim().length === 0) {
         setResults([]);
         setIsLoading(false);
+        setIsOpen(false);
         return;
       }
 
       setIsLoading(true);
+      setIsOpen(true);
+
       try {
-        const response = await fetch(
-          `/api/search?q=${encodeURIComponent(debouncedQuery)}&limit=10`
-        );
+        // In CMS, include private/draft pages
+        const searchUrl = `/api/search?q=${encodeURIComponent(
+          debouncedQuery
+        )}&limit=10${isCMS ? "&includePrivate=true" : ""}`;
+
+        const response = await fetch(searchUrl, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(
+            `Search failed: ${response.status} ${response.statusText}`
+          );
+        }
+
         const data = await response.json();
-        setResults(data.results || []);
+
+        if (data.error) {
+          console.error("Search API error:", data.error);
+          setResults([]);
+        } else {
+          setResults(data.results || []);
+        }
       } catch (error) {
         console.error("Search failed:", error);
         setResults([]);
@@ -121,10 +150,16 @@ export function SearchBar() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setQuery(value);
-    setIsOpen(value.trim().length > 0);
     setSelectedIndex(0);
+
+    // Open dropdown when user starts typing
     if (value.trim().length > 0) {
+      setIsOpen(true);
       setIsLoading(true);
+    } else {
+      setIsOpen(false);
+      setResults([]);
+      setIsLoading(false);
     }
   };
 
@@ -144,21 +179,34 @@ export function SearchBar() {
           placeholder="Search documentation..."
           value={query}
           onChange={handleInputChange}
-          onFocus={() => query.trim().length > 0 && setIsOpen(true)}
+          onFocus={() => {
+            // Always open dropdown on focus to show search UI
+            setIsOpen(true);
+          }}
           onKeyDown={handleKeyDown}
           className="w-full pl-10 pr-4 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         />
-        {isLoading && (
-          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground animate-spin" />
-        )}
       </div>
 
       {/* Search Results Dropdown */}
       {isOpen && (
         <div className="absolute top-full mt-2 w-full bg-popover border border-border rounded-md shadow-lg max-h-96 overflow-y-auto z-50">
-          {results.length === 0 && !isLoading && query.trim().length > 0 && (
+          {isLoading && (
+            <div className="p-4 text-center text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" />
+              Searching...
+            </div>
+          )}
+
+          {!isLoading && results.length === 0 && query.trim().length > 0 && (
             <div className="p-4 text-center text-muted-foreground">
               No results found for &quot;{query}&quot;
+            </div>
+          )}
+
+          {!isLoading && results.length === 0 && query.trim().length === 0 && (
+            <div className="p-4 text-center text-muted-foreground text-sm">
+              Start typing to search documentation...
             </div>
           )}
 
@@ -205,4 +253,3 @@ export function SearchBar() {
     </div>
   );
 }
-

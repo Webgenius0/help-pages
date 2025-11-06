@@ -69,7 +69,11 @@ export async function PUT(
     }
 
     // Explicitly remove isPublic from body if present (Pages don't have isPublic - it's inherited from Doc)
-    const { isPublic: _isPublic, ...cleanBody } = body as any;
+    const {
+      isPublic: _isPublic,
+      isAutosave: _isAutosave,
+      ...cleanBody
+    } = body as any;
     if (_isPublic !== undefined) {
       console.warn(
         "Ignoring isPublic field in request - Pages inherit visibility from their parent Doc"
@@ -78,6 +82,28 @@ export async function PUT(
 
     let { title, slug, content, summary, description, position, status } =
       cleanBody;
+
+    // Check if this is an autosave request
+    const isAutosave =
+      request.headers.get("X-Autosave") === "true" || _isAutosave === true;
+
+    // Create a revision before updating (only if content or title changed)
+    const currentPage = await prisma.page.findUnique({
+      where: { id },
+    });
+
+    // Log autosave requests for debugging
+    if (isAutosave) {
+      console.log("🔵 AUTOSAVE REQUEST RECEIVED:", {
+        pageId: id,
+        userId: profile.id,
+        hasTitle: !!title,
+        hasContent: !!content,
+        hasSummary: !!summary,
+        status: status || currentPage?.status,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     // Normalize and validate slug if provided
     if (slug !== undefined) {
@@ -91,11 +117,6 @@ export async function PUT(
       }
       slug = normalizedSlug;
     }
-
-    // Create a revision before updating (only if content or title changed)
-    const currentPage = await prisma.page.findUnique({
-      where: { id },
-    });
 
     if (!currentPage) {
       console.error("Page not found:", id);
@@ -140,11 +161,14 @@ export async function PUT(
     }
 
     // Only create revision if content or title actually changed
+    // Skip revision creation for autosave unless there are significant changes
+    // This reduces database writes and improves autosave performance
     const contentChanged =
       content !== undefined && content !== currentPage.content;
     const titleChanged = title !== undefined && title !== currentPage.title;
 
-    if (contentChanged || titleChanged) {
+    // Skip revision creation for autosave unless there are significant changes
+    if (!isAutosave && (contentChanged || titleChanged)) {
       try {
         await prisma.pageRevision.create({
           data: {
@@ -162,6 +186,41 @@ export async function PUT(
       } catch (revisionError: any) {
         // Log but don't fail the update if revision creation fails
         console.warn("Failed to create revision:", revisionError?.message);
+      }
+    } else if (isAutosave && (contentChanged || titleChanged)) {
+      // For autosave, only create revision for significant content/title changes
+      // This balances data safety with performance
+      const contentLength = currentPage.content?.length || 0;
+      const newContentLength = content?.length || 0;
+      const contentChangePercent =
+        contentLength > 0
+          ? (Math.abs(newContentLength - contentLength) / contentLength) * 100
+          : newContentLength > 0
+          ? 100
+          : 0;
+
+      // Only create revision if change is significant (>10% of content length or title changed)
+      if (titleChanged || contentChangePercent > 10) {
+        try {
+          await prisma.pageRevision.create({
+            data: {
+              pageId: id,
+              userId: profile.id,
+              snapshot: {
+                title: currentPage.title,
+                slug: currentPage.slug,
+                content: currentPage.content,
+                summary: currentPage.summary,
+                status: currentPage.status,
+              },
+            },
+          });
+        } catch (revisionError: any) {
+          console.warn(
+            "Failed to create revision during autosave:",
+            revisionError?.message
+          );
+        }
       }
     }
 
@@ -227,12 +286,20 @@ export async function PUT(
     // }
 
     // Ensure we have at least one field to update
-    if (Object.keys(updateData).length === 0) {
+    // For autosave, always allow empty updates to ensure timestamp is updated
+    if (Object.keys(updateData).length === 0 && !isAutosave) {
       console.warn("No fields to update");
       return NextResponse.json({
         error: "No fields provided for update",
         page: currentPage,
       });
+    }
+
+    // For autosave, ensure at least updatedAt is touched even if no fields changed
+    // This ensures the database knows the page was recently saved
+    if (isAutosave && Object.keys(updateData).length === 0) {
+      // Force update by touching a field that always exists
+      updateData.summary = currentPage.summary; // This will trigger an update
     }
 
     // Validate data types before sending to Prisma
@@ -280,6 +347,21 @@ export async function PUT(
     });
 
     try {
+      console.log("🔵 Attempting database update:", {
+        pageId: id,
+        isAutosave,
+        updateDataKeys: Object.keys(updateData),
+        updateData: Object.keys(updateData).reduce((acc, key) => {
+          const value = updateData[key as keyof typeof updateData];
+          if (key === "content") {
+            acc[key] = value ? `[${(value as string).length} chars]` : null;
+          } else {
+            acc[key] = value;
+          }
+          return acc;
+        }, {} as Record<string, any>),
+      });
+
       const page = await prisma.page.update({
         where: { id },
         data: updateData,
@@ -298,7 +380,19 @@ export async function PUT(
         },
       });
 
-      console.log("Page updated successfully:", { id, status: page.status });
+      if (isAutosave) {
+        console.log("✅ Page autosaved successfully:", {
+          id,
+          status: page.status,
+          updatedAt: page.updatedAt,
+          title: page.title?.substring(0, 50),
+        });
+      } else {
+        console.log("✅ Page updated successfully:", {
+          id,
+          status: page.status,
+        });
+      }
 
       return NextResponse.json({ page });
     } catch (updateError: any) {
