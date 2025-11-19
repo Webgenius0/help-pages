@@ -1,7 +1,7 @@
 /**
  * Test database connection script
  * Run with: npx tsx scripts/test-db-connection.ts
- */
+ **/
 
 import { PrismaClient } from '@prisma/client';
 

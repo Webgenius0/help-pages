@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  Save,
   Eye,
   Check,
   Clock,
@@ -12,11 +11,9 @@ import {
   ChevronDown,
   FileText,
   Globe,
-  Loader2,
 } from "lucide-react";
 import { useAutosave } from "@/hooks/useAutosave";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
-import toast from "react-hot-toast";
 
 interface NavHeader {
   id: string;
@@ -63,23 +60,10 @@ export default function PageEditorClient({
       status: string;
       slug?: string;
     }): Promise<void> => {
-      console.log("[handleAutosave] 🔵 Called with data:", {
-        title: data.title?.substring(0, 50),
-        content: data.content?.substring(0, 50),
-        summary: data.summary?.substring(0, 50),
-        status: data.status,
-        pageId: page.id,
-      });
-
       // For new pages (no ID yet), we cannot autosave
       if (!page.id) {
-        console.log(
-          "[handleAutosave] ⚠️ Page has no ID, cannot autosave new pages yet"
-        );
         throw new Error("AUTOSAVE_SKIPPED_NO_ID");
       }
-
-      console.log("[handleAutosave] ✅ All checks passed, making API call...");
 
       // Prepare autosave data - use current values from state
       // Use slug from data if provided, otherwise use current slug or generate from title
@@ -96,19 +80,6 @@ export default function PageEditorClient({
         isAutosave: true,
       };
 
-      console.log(
-        "[handleAutosave] 📤 Making PUT request to:",
-        `/api/pages/${page.id}`,
-        {
-          pageId: page.id,
-          endpoint: `/api/pages/${page.id}`,
-          method: "PUT",
-          hasTitle: !!autosaveData.title,
-          hasContent: !!autosaveData.content,
-          data: autosaveData,
-        }
-      );
-
       // Use the exact same endpoint format as manual save
       const response = await fetch(`/api/pages/${page.id}`, {
         method: "PUT",
@@ -119,32 +90,16 @@ export default function PageEditorClient({
         body: JSON.stringify(autosaveData),
       });
 
-      console.log("[handleAutosave] 📥 Response received:", {
-        ok: response.ok,
-        status: response.status,
-        statusText: response.statusText,
-      });
-
       if (!response.ok) {
         const errorData = await response
           .json()
           .catch(() => ({ error: "Failed to parse error response" }));
         const errorMessage =
           errorData.error || errorData.details || "Failed to autosave";
-        console.error(
-          "[handleAutosave] ❌ Autosave failed:",
-          errorMessage,
-          errorData
-        );
         throw new Error(errorMessage);
       }
 
       const result = await response.json();
-      console.log("[handleAutosave] ✅ Autosave successful:", {
-        pageId: page.id,
-        updated: !!result.page,
-        result,
-      });
 
       // Update page state if response includes updated page
       if (result.page) {
@@ -158,8 +113,6 @@ export default function PageEditorClient({
     [page.id, slug, title, content, summary, status, page.slug]
   );
 
-  // Memoize autosave data to ensure stable reference
-  // Only create new object when values actually change
   // Include slug so slug changes trigger autosave
   const autosaveData = useMemo(() => {
     return { title, content, summary, status, slug };
@@ -173,54 +126,11 @@ export default function PageEditorClient({
   } = useAutosave(autosaveData, {
     delay: 2000, // Auto-save after 2 seconds of inactivity (optimized for better UX)
     onSave: handleAutosave,
-    onError: (err) => {
-      // Log autosave errors for debugging
-      console.error("[useAutosave] Error:", err.message || err);
-    },
+    onError: (err) => {},
   });
-
-  // Debug: Log when autosave state changes
-  useEffect(() => {
-    console.log("[PageEditor] Autosave state:", {
-      isAutosaving,
-      lastSaved,
-      hasError: !!autosaveError,
-      error: autosaveError?.message,
-    });
-  }, [isAutosaving, lastSaved, autosaveError]);
-
-  // Debug: Log when form values change
-  useEffect(() => {
-    console.log("[PageEditor] 📝 Form values changed:", {
-      title: title.substring(0, 50),
-      slug: slug.substring(0, 50),
-      contentLength: content.length,
-      summary: summary?.substring(0, 50),
-      status,
-      pageId: page.id,
-    });
-  }, [title, slug, content, summary, status, page.id]);
-
-  // Debug: Log the autosave data object being passed to the hook
-  useEffect(() => {
-    const autosaveData = { title, content, summary, status, slug };
-    console.log("[PageEditor] 🔄 Autosave data object:", {
-      ...autosaveData,
-      title: autosaveData.title.substring(0, 50),
-      slug: autosaveData.slug?.substring(0, 50),
-      content: `[${autosaveData.content.length} chars]`,
-      summary: autosaveData.summary?.substring(0, 50),
-      status: autosaveData.status,
-    });
-  }, [title, content, summary, status, slug]);
 
   // Sync local state when page prop changes (e.g., after page reload)
   useEffect(() => {
-    console.log("[PageEditor] 🔄 Page changed, resetting state:", {
-      pageId: initialPage.id,
-      title: initialPage.title.substring(0, 50),
-    });
-
     setPage(initialPage);
     setTitle(initialPage.title);
     setSlug(initialPage.slug);
@@ -244,9 +154,6 @@ export default function PageEditorClient({
   const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus);
     setStatusDropdownOpen(false);
-
-    // Status change will trigger autosave via the useAutosave hook
-    // No manual save needed
   };
 
   return (

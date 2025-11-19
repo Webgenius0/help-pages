@@ -56,19 +56,70 @@ export default function SignupPage() {
         throw new Error(data.error || 'Failed to create account')
       }
 
-      // Auto-login after signup
-      const result = await signIn('credentials', {
-        email,
-        password,
-        redirect: false,
-      })
+      // Create auto-login token
+      try {
+        const tokenResponse = await fetch('/api/auth/auto-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        })
 
-      if (result?.error) {
-        setError('Account created but login failed. Please try logging in.')
-        setLoading(false)
-      } else {
-        router.push('/cms')
-        router.refresh()
+        if (tokenResponse.ok) {
+          const tokenData = await tokenResponse.json()
+          const subdomainUrl = data.user?.subdomainUrl || `/cms`
+          
+          if (data.user?.subdomainUrl && data.user.subdomainUrl.startsWith('http')) {
+            // Redirect to subdomain login with token
+            const loginUrl = data.user.subdomainUrl.replace('/cms', '/auth/login')
+            const autoLoginUrl = `${loginUrl}?autoLogin=true&token=${tokenData.token}`
+            window.location.href = autoLoginUrl
+          } else {
+            // Fallback: login on main domain
+            const result = await signIn('credentials', {
+              email,
+              password,
+              redirect: false,
+            })
+
+            if (result?.error) {
+              setError('Account created but login failed. Please try logging in.')
+              setLoading(false)
+            } else {
+              router.push('/cms')
+              router.refresh()
+            }
+          }
+        } else {
+          // If token creation fails, try regular login
+          const result = await signIn('credentials', {
+            email,
+            password,
+            redirect: false,
+          })
+
+          if (result?.error) {
+            setError('Account created but login failed. Please try logging in.')
+            setLoading(false)
+          } else {
+            router.push('/cms')
+            router.refresh()
+          }
+        }
+      } catch (tokenError) {
+        // If token creation fails, try regular login
+        const result = await signIn('credentials', {
+          email,
+          password,
+          redirect: false,
+        })
+
+        if (result?.error) {
+          setError('Account created but login failed. Please try logging in.')
+          setLoading(false)
+        } else {
+          router.push('/cms')
+          router.refresh()
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Something went wrong')

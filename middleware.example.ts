@@ -1,3 +1,10 @@
+/**
+ * Example Middleware for Subdomain Detection
+ * 
+ * This file shows how to update your middleware.ts to detect and handle subdomains.
+ * Copy the relevant parts to your actual middleware.ts file.
+ */
+
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -7,47 +14,42 @@ export function middleware(request: NextRequest) {
   
   // Extract subdomain from hostname
   // Examples:
-  // - "johndoe.helppages.ai" → subdomain = "johndoe"
-  // - "helppages.ai" → subdomain = null (main domain)
-  // - "www.helppages.ai" → subdomain = null (www is ignored)
+  // - "user1.helppages.ai" → "user1"
+  // - "helppages.ai" → "helppages" (main domain, we'll handle this)
   const parts = hostname.split(".");
-  const isMainDomain = 
-    hostname === "helppages.ai" || 
-    hostname === "www.helppages.ai" ||
-    parts.length <= 2; // helppages.ai has 2 parts
+  const isMainDomain = hostname === "helppages.ai" || 
+                       hostname === "www.helppages.ai" ||
+                       parts.length <= 2; // helppages.ai has 2 parts
   
   let subdomain: string | null = null;
   
   if (!isMainDomain && parts.length > 2) {
     // Extract subdomain (first part before the domain)
     subdomain = parts[0];
-    
-    // Ignore common prefixes
-    if (subdomain === "www" || subdomain === "api") {
-      subdomain = null;
-    }
   }
   
   // Handle subdomain requests
-  if (subdomain) {
-    // Add subdomain to headers for server components and API routes
+  if (subdomain && subdomain !== "www") {
+    // Option 1: Add subdomain to request headers for server components
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-subdomain", subdomain);
     requestHeaders.set("x-hostname", hostname);
     
-    // If accessing root or /cms on subdomain, ensure we're on /cms
-    // This allows users to access their CMS via: username.helppages.ai or username.helppages.ai/cms
-    if (pathname === "/" || pathname === "") {
+    // Option 2: Rewrite to /u/[subdomain] route for subdomain access
+    // Uncomment this if you want subdomains to automatically route to /u/[username]
+    /*
+    if (pathname === "/" || pathname.startsWith("/docs")) {
       const url = request.nextUrl.clone();
-      url.pathname = "/cms";
+      url.pathname = `/u/${subdomain}${pathname === "/" ? "" : pathname}`;
       return NextResponse.rewrite(url, {
         request: {
           headers: requestHeaders,
         },
       });
     }
+    */
     
-    // For all other paths on subdomain, pass through with subdomain header
+    // Return with subdomain headers
     return NextResponse.next({
       request: {
         headers: requestHeaders,
@@ -55,32 +57,19 @@ export function middleware(request: NextRequest) {
     });
   }
   
-  // Main domain behavior - redirect authenticated users to their subdomain
-  if (isMainDomain && pathname.startsWith("/cms")) {
-    // Check if user is authenticated by checking for session cookie
-    const sessionToken = request.cookies.get("next-auth.session-token") || 
-                         request.cookies.get("__Secure-next-auth.session-token");
-    
-    if (sessionToken) {
-      // User is logged in, but we need to get their username to redirect
-      // We'll let the CMS page handle this redirect since it has access to user data
-      // For now, just pass through and let the page component redirect
-    }
-  }
-
-  // Main domain behavior - existing redirects
+  // Existing redirects (keep your current logic)
   if (pathname.startsWith("/dashboard")) {
     const url = request.nextUrl.clone();
     url.pathname = pathname.replace("/dashboard", "/cms");
     return NextResponse.redirect(url);
   }
-
+  
   if (pathname.includes("/cms/all-courses")) {
     const url = request.nextUrl.clone();
     url.pathname = "/cms";
     return NextResponse.redirect(url);
   }
-
+  
   return NextResponse.next();
 }
 

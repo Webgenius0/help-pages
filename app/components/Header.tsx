@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
 import { SearchBar } from "./SearchBar";
 import { ThemeToggle } from "./ThemeToggle";
+import { handleLogout } from "@/lib/logout";
 
 export function Header() {
   const { data: session } = useSession();
@@ -104,7 +105,7 @@ export function Header() {
                         <span>User Management</span>
                       </Link>
                       <button
-                        onClick={() => signOut()}
+                        onClick={handleLogout}
                         className="flex items-center w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors text-left"
                       >
                         <LogOut className="w-4 h-4 mr-3 shrink-0" />
@@ -198,7 +199,7 @@ export function Header() {
                   </Link>
                   <button
                     onClick={() => {
-                      signOut();
+                      handleLogout();
                       setIsMobileMenuOpen(false);
                     }}
                     className="flex items-center w-full px-3 py-2 text-base text-foreground hover:text-primary hover:bg-accent rounded-md transition-colors font-medium text-left"

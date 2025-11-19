@@ -29,6 +29,11 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error",
     newUser: "/cms",
   },
+  // Ensure NEXTAUTH_URL is set correctly for production
+  // This prevents redirects to localhost
+  ...(process.env.NEXTAUTH_URL && {
+    url: process.env.NEXTAUTH_URL,
+  }),
   providers: [
     CredentialsProvider({
       name: "credentials",

@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { User, LogOut, Settings } from "lucide-react";
 import { SearchBar } from "./SearchBar";
 import { ThemeToggle } from "./ThemeToggle";
+import { handleLogout } from "@/lib/logout";
 
 export function CMSHeader() {
   const { data: session } = useSession();
@@ -56,7 +57,7 @@ export function CMSHeader() {
                       <span>User Management</span>
                     </Link>
                     <button
-                      onClick={() => signOut()}
+                      onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors text-left"
                     >
                       <LogOut className="w-4 h-4 mr-3 shrink-0" />
@@ -87,4 +88,3 @@ export function CMSHeader() {
     </header>
   );
 }
-

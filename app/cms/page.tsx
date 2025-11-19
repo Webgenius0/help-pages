@@ -1,20 +1,41 @@
 import { redirect } from "next/navigation";
 import { getUser, getProfile } from "@/lib/auth";
 import { DashboardClient } from "./DashboardClient";
+import { SubdomainGuard } from "./subdomain-guard";
+import { getSubdomain } from "@/lib/subdomain";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   try {
+    const subdomain = await getSubdomain();
     const user = await getUser();
 
     if (!user) {
+      // If on subdomain, redirect to subdomain login
+      if (subdomain) {
+        redirect(`https://${subdomain}.helppages.ai/auth/login?redirect=/cms`);
+      }
       redirect("/auth/login");
     }
 
     const profile = await getProfile();
 
-    return <DashboardClient email={user.email || ""} profile={profile} />;
+    // If on main domain and user is logged in, redirect to their subdomain
+    if (!subdomain && profile?.username) {
+      redirect(`https://${profile.username}.helppages.ai/cms`);
+    }
+
+    // If on subdomain, ensure it matches user's username
+    if (subdomain && profile && subdomain !== profile.username) {
+      redirect(`https://${profile.username}.helppages.ai/cms`);
+    }
+
+    return (
+      <SubdomainGuard>
+        <DashboardClient email={user.email || ""} profile={profile} />
+      </SubdomainGuard>
+    );
   } catch (error: any) {
     console.error("Dashboard page error:", error);
 

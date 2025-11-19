@@ -150,11 +150,15 @@ export async function POST(request: Request) {
       }
     }
 
+    // Return user info including subdomain URL
+    const subdomainUrl = `https://${user.username}.helppages.ai/cms`;
+
     return NextResponse.json({
       user: {
         id: user.id,
         email: user.email,
         username: user.username,
+        subdomainUrl, // Add subdomain URL for frontend to use
       },
     });
   } catch (error: any) {

@@ -14,6 +14,8 @@ import {
   Globe,
   Lock,
   Loader2,
+  Copy,
+  Check,
 } from "lucide-react";
 import { generateSlug, isValidSlug, getSlugErrorMessage } from "@/lib/slug";
 import toast from "react-hot-toast";
@@ -60,7 +62,8 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
   const [creating, setCreating] = useState(false);
   const [showNewDocModal, setShowNewDocModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+  const [copiedDocId, setCopiedDocId] = useState<string | null>(null);
+
   // Confirm modal state
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -196,6 +199,26 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
     createDoc();
   };
 
+  const handleCopyLink = async (doc: Doc) => {
+    if (typeof window === "undefined") return;
+
+    const docUrl = `${window.location.origin}/docs/${doc.slug}`;
+
+    try {
+      await navigator.clipboard.writeText(docUrl);
+      setCopiedDocId(doc.id);
+      toast.success("Link copied to clipboard!");
+
+      // Reset the copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedDocId(null);
+      }, 2000);
+    } catch (error) {
+      console.error("Failed to copy link:", error);
+      toast.error("Failed to copy link");
+    }
+  };
+
   const handleDeleteDoc = async (docId: string, title: string) => {
     setConfirmModal({
       isOpen: true,
@@ -213,7 +236,12 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
           if (response.ok) {
             await loadDocs();
             toast.success("Documentation deleted successfully!");
-            setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} });
+            setConfirmModal({
+              isOpen: false,
+              title: "",
+              message: "",
+              onConfirm: () => {},
+            });
           } else {
             const data = await response.json();
             toast.error(data.error || "Failed to delete documentation");
@@ -476,16 +504,48 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
                       <Edit2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>Manage</span>
                     </Link>
-                    {doc.isPublic && (
+                    {/* Allow owners to view their own docs even if private */}
+                    {doc.isPublic || doc.userId === profile?.id ? (
                       <Link
                         href={`/docs/${doc.slug}`}
                         target="_blank"
                         className="btn-secondary flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4"
+                        title={
+                          doc.isPublic
+                            ? "View public documentation"
+                            : "Preview your private documentation"
+                        }
                       >
                         <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span className="hidden sm:inline">View</span>
                       </Link>
+                    ) : (
+                      <button
+                        disabled
+                        className="btn-secondary flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4 opacity-50 cursor-not-allowed"
+                        title="Make documentation public to view"
+                      >
+                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span className="hidden sm:inline">View</span>
+                      </button>
                     )}
+                    <button
+                      onClick={() => handleCopyLink(doc)}
+                      className="btn-secondary flex items-center justify-center space-x-1.5 sm:space-x-2 text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4"
+                      title="Copy public view link"
+                    >
+                      {copiedDocId === doc.id ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">Copy</span>
+                        </>
+                      )}
+                    </button>
                     {/* Only show delete button to owner or admin (not editors) */}
                     {(profile?.role === "admin" ||
                       doc.userId === profile?.id) && (
@@ -504,11 +564,18 @@ export function DashboardClient({ email, profile }: DashboardClientProps) {
           </div>
         )}
       </div>
-      
+
       {/* Confirm Modal */}
       <ConfirmModal
         isOpen={confirmModal.isOpen}
-        onClose={() => setConfirmModal({ isOpen: false, title: "", message: "", onConfirm: () => {} })}
+        onClose={() =>
+          setConfirmModal({
+            isOpen: false,
+            title: "",
+            message: "",
+            onConfirm: () => {},
+          })
+        }
         onConfirm={confirmModal.onConfirm}
         title={confirmModal.title}
         message={confirmModal.message}
