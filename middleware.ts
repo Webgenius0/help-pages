@@ -35,19 +35,9 @@ export function middleware(request: NextRequest) {
     requestHeaders.set("x-subdomain", subdomain);
     requestHeaders.set("x-hostname", hostname);
     
-    // If accessing root or /cms on subdomain, ensure we're on /cms
-    // This allows users to access their CMS via: username.helppages.ai or username.helppages.ai/cms
-    if (pathname === "/" || pathname === "") {
-      const url = request.nextUrl.clone();
-      url.pathname = "/cms";
-      return NextResponse.rewrite(url, {
-        request: {
-          headers: requestHeaders,
-        },
-      });
-    }
-    
-    // For all other paths on subdomain, pass through with subdomain header
+    // Root path on subdomain should show home page, not CMS
+    // Users can access CMS via: username.helppages.ai/cms
+    // For all paths on subdomain, pass through with subdomain header
     return NextResponse.next({
       request: {
         headers: requestHeaders,
@@ -56,11 +46,16 @@ export function middleware(request: NextRequest) {
   }
   
   // Main domain behavior - redirect authenticated users to their subdomain
+  // Check if user is authenticated by checking for session cookie
+  const sessionToken = request.cookies.get("next-auth.session-token") || 
+                       request.cookies.get("__Secure-next-auth.session-token");
+  
+  if (isMainDomain && sessionToken && (pathname === "/" || pathname === "")) {
+    // User is logged in on main domain root - redirect will be handled by page component
+    // which has access to user profile data
+  }
+  
   if (isMainDomain && pathname.startsWith("/cms")) {
-    // Check if user is authenticated by checking for session cookie
-    const sessionToken = request.cookies.get("next-auth.session-token") || 
-                         request.cookies.get("__Secure-next-auth.session-token");
-    
     if (sessionToken) {
       // User is logged in, but we need to get their username to redirect
       // We'll let the CMS page handle this redirect since it has access to user data

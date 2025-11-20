@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   BookOpen,
   Zap,
@@ -9,6 +10,8 @@ import {
 } from "lucide-react";
 import prisma from "@/lib/prisma";
 import { Header } from "./components/Header";
+import { getUser, getProfile } from "@/lib/auth";
+import { getSubdomain } from "@/lib/subdomain";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60; // Revalidate every 60 seconds
@@ -45,6 +48,15 @@ async function getPublicDocs() {
 }
 
 export default async function HomePage() {
+  const subdomain = await getSubdomain();
+  const user = await getUser();
+  const profile = await getProfile();
+
+  // If user is logged in and on main domain, redirect to their subdomain
+  if (!subdomain && user && profile?.username) {
+    redirect(`https://${profile.username}.helppages.ai/`);
+  }
+
   const recentDocs = await getPublicDocs();
 
   return (
