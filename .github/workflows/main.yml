@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - emon
+      # - emon
 
 jobs:
   web-deploy:
