@@ -1,0 +1,37 @@
+name: 🚀 Deploy website on push
+
+on:
+  push:
+    branches:
+      - main
+      # - emon
+
+jobs:
+  web-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚚 Checkout code
+        uses: actions/checkout@v4
+
+      # Deploy for 'emon' branch
+      - name: 📂 Deploy to Softvence FTP
+        if: github.ref == 'refs/heads/emon'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ftp.softvencefsd.xyz
+          username: gmcallister@gmcallister.softvencefsd.xyz
+          password: Password@432!
+          port: 21
+          protocol: ftp
+
+      # Deploy for 'main' branch
+      - name: 📂 Deploy to PDSAI FTP
+        if: github.ref == 'refs/heads/main'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: 40.74.216.122
+          username: helppages_ftp
+          password: Password@4321!
+          port: 21
+          protocol: ftp
