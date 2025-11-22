@@ -55,6 +55,8 @@ export default async function HomePage() {
   // If user is logged in and on main domain, redirect to their subdomain
   if (!subdomain && user && profile?.username) {
     redirect(`https://${profile.username}.helppages.ai/`);
+  } else {
+    redirect("https://helppages.ai/");
   }
 
   const recentDocs = await getPublicDocs();
