@@ -8,7 +8,7 @@ HelpPages is a SaaS documentation platform that allows users to create and manag
 
 ### Key Features
 
-- **Subdomain-Based CMS**: Each user gets a unique subdomain for their documentation
+- **Subdomain-Based CMS**: Each user gets a unique subdomain for their documentation.
 - **Hierarchical Navigation**: Dropdowns → Items → Sections → Pages structure
 - **Content Management**: Create, edit, and organize documentation pages
 - **Version Control**: Track changes and restore previous versions
