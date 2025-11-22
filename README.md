@@ -28,6 +28,7 @@ The platform uses a subdomain-based architecture:
 - **User Subdomains** (`username.helppages.ai`): Each user's personal CMS and documentation
 
 When a user signs up:
+
 1. They choose a username
 2. Their subdomain is automatically created: `username.helppages.ai`
 3. They can access their CMS at `https://username.helppages.ai/cms`
@@ -67,12 +68,14 @@ Dropdown (e.g., "Products")
 ### Installation
 
 1. **Clone the repository:**
+
 ```bash
 git clone <repository-url>
 cd superbase-docs
 ```
 
 2. **Install dependencies:**
+
 ```bash
 npm install
 ```
@@ -94,6 +97,7 @@ NEXT_PUBLIC_DOMAIN="helppages.ai"
 ```
 
 4. **Set up the database:**
+
 ```bash
 # Generate Prisma Client
 npx prisma generate
@@ -106,11 +110,13 @@ npm run seed
 ```
 
 5. **Start the development server:**
+
 ```bash
 npm run dev
 ```
 
 6. **Access the application:**
+
 - Main site: http://localhost:3000
 - CMS Dashboard: http://localhost:3000/cms (after login)
 
@@ -120,7 +126,7 @@ npm run dev
 
 1. **Sign Up**: Create an account at the main domain
 2. **Access Your CMS**: You'll be redirected to your subdomain CMS
-3. **Create Documentation**: 
+3. **Create Documentation**:
    - Create a new documentation project
    - Add dropdowns (e.g., "Products", "Guides")
    - Add items to dropdowns (e.g., "Database", "Auth")
@@ -173,11 +179,13 @@ superbase-docs/
 #### API Endpoints
 
 **Authentication:**
+
 - `POST /api/auth/signup` - Create new user
 - `POST /api/auth/login` - User login
 - `GET /api/auth/profile` - Get user profile
 
 **Documentation:**
+
 - `GET /api/docs` - List user's documentation projects
 - `POST /api/docs` - Create new documentation
 - `GET /api/docs/[id]` - Get documentation details
@@ -185,12 +193,14 @@ superbase-docs/
 - `DELETE /api/docs/[id]` - Delete documentation
 
 **Navigation:**
+
 - `GET /api/nav-headers?docId=...` - Get dropdowns/sections
 - `POST /api/nav-headers` - Create dropdown/section
 - `GET /api/doc-items?navHeaderId=...` - Get items in dropdown
 - `POST /api/doc-items` - Create item
 
 **Pages:**
+
 - `GET /api/pages?docId=...&docItemId=...` - Get pages
 - `POST /api/pages` - Create page
 - `GET /api/pages/[id]` - Get page details
@@ -204,9 +214,11 @@ superbase-docs/
 For production, you need to configure wildcard subdomain DNS and web server:
 
 1. **DNS Configuration**: Add a wildcard A record:
+
    - `*.helppages.ai` → Your server IP
 
 2. **Server Configuration**: Configure your web server (Nginx/Apache) to handle wildcard subdomains:
+
    - Set up wildcard SSL certificate (`*.helppages.ai`)
    - Configure server to accept all subdomains
    - Proxy requests to your Next.js application (default port 3000)
