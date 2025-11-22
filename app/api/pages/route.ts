@@ -108,6 +108,7 @@ export async function GET(request: NextRequest) {
 
     const searchParams = request.nextUrl.searchParams
     const docId = searchParams.get('docId')
+    const docItemId = searchParams.get('docItemId')
     const navHeaderId = searchParams.get('navHeaderId')
     const status = searchParams.get('status')
 
@@ -133,12 +134,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
+    // Build where clause with proper filtering
+    const whereClause: any = {
+      docId: docId,
+    }
+
+    // If docItemId is provided, filter by it (pages directly in item or in sections within item)
+    if (docItemId) {
+      whereClause.docItemId = docItemId
+    }
+
+    // If navHeaderId is provided, filter by it (pages in a specific section)
+    if (navHeaderId) {
+      whereClause.navHeaderId = navHeaderId
+    }
+
+    // Filter by status if provided
+    if (status) {
+      whereClause.status = status
+    }
+
     const pages = await prisma.page.findMany({
-      where: {
-        docId: docId,
-        ...(navHeaderId && { navHeaderId }),
-        ...(status && { status }),
-      },
+      where: whereClause,
       orderBy: [
         { position: 'asc' },
         { createdAt: 'asc' },

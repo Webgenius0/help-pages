@@ -1,17 +1,47 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import { Menu, X, User, LogOut, Settings, BookOpen } from "lucide-react";
 import { SearchBar } from "./SearchBar";
 import { ThemeToggle } from "./ThemeToggle";
+import { handleLogout } from "@/lib/logout";
 
 export function Header() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [dashboardUrl, setDashboardUrl] = useState("/cms");
+
+  // Get user's subdomain URL for dashboard
+  useEffect(() => {
+    if (session) {
+      const hostname = window.location.hostname;
+      const parts = hostname.split(".");
+      const isSubdomain = parts.length > 2 && parts[0] !== "www" && parts[0] !== "api";
+      
+      if (isSubdomain) {
+        // Already on subdomain, use relative path
+        setDashboardUrl("/cms");
+      } else {
+        // On main domain, fetch username and construct subdomain URL
+        fetch("/api/auth/profile")
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.profile?.username) {
+              setDashboardUrl(`https://${data.profile.username}.helppages.ai/cms`);
+            }
+          })
+          .catch((err) => {
+            console.error("Error fetching profile:", err);
+            // Fallback to relative path
+            setDashboardUrl("/cms");
+          });
+      }
+    }
+  }, [session]);
 
   // Don't show header on public docs routes (/u/*) or CMS routes
   if (pathname?.startsWith("/u/") || pathname?.startsWith("/cms")) {
@@ -74,7 +104,7 @@ export function Header() {
             {session ? (
               <div className="hidden sm:flex items-center gap-3">
                 <Link
-                  href="/cms"
+                  href={dashboardUrl}
                   className="btn-primary inline-flex items-center justify-center px-4 sm:px-5 py-2 sm:py-2.5 text-sm sm:text-base whitespace-nowrap"
                 >
                   Dashboard
@@ -90,7 +120,7 @@ export function Header() {
                   <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
                     <div className="py-1">
                       <Link
-                        href="/cms"
+                        href={dashboardUrl}
                         className="flex items-center px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
                       >
                         <Settings className="w-4 h-4 mr-3 shrink-0" />
@@ -104,7 +134,7 @@ export function Header() {
                         <span>User Management</span>
                       </Link>
                       <button
-                        onClick={() => signOut()}
+                        onClick={handleLogout}
                         className="flex items-center w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors text-left"
                       >
                         <LogOut className="w-4 h-4 mr-3 shrink-0" />
@@ -190,7 +220,7 @@ export function Header() {
               {session ? (
                 <>
                   <Link
-                    href="/cms"
+                    href={dashboardUrl}
                     className="btn-primary inline-flex items-center justify-center px-3 py-2 text-base"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
@@ -198,7 +228,7 @@ export function Header() {
                   </Link>
                   <button
                     onClick={() => {
-                      signOut();
+                      handleLogout();
                       setIsMobileMenuOpen(false);
                     }}
                     className="flex items-center w-full px-3 py-2 text-base text-foreground hover:text-primary hover:bg-accent rounded-md transition-colors font-medium text-left"

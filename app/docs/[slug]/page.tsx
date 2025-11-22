@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import prisma from "@/lib/prisma";
 import { PublicDocsView } from "./PublicDocsView";
+import { getUser, getProfile } from "@/lib/auth";
 
 // Static generation with ISR - revalidate every 60 seconds
 // Pages are statically generated at build time and revalidated every 60 seconds
@@ -41,7 +42,27 @@ export default async function PublicDocPage({
     },
   });
 
-  if (!doc || !doc.isPublic) {
+  if (!doc) {
+    notFound();
+  }
+
+  // Check if doc is public or if user is the owner
+  const isPublic = doc.isPublic;
+  let isOwner = false;
+
+  if (!isPublic) {
+    // Check if current user is the owner
+    const user = await getUser();
+    if (user?.email) {
+      const profile = await getProfile();
+      if (profile && doc.userId === profile.id) {
+        isOwner = true;
+      }
+    }
+  }
+
+  // Only allow access if doc is public or user is the owner
+  if (!isPublic && !isOwner) {
     notFound();
   }
 

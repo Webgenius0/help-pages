@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
@@ -17,6 +17,10 @@ export default function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Check for auto-login from signup
+  const autoLogin = searchParams?.get("autoLogin") === "true";
+  const autoLoginToken = searchParams?.get("token") || "";
+
   // Validate callbackUrl to prevent redirecting to non-existent routes
   const rawCallbackUrl = searchParams?.get("callbackUrl") || "/cms";
   // Only allow cms routes as callback URLs for security
@@ -25,6 +29,53 @@ export default function LoginForm() {
     !rawCallbackUrl.includes("/cms/all-courses")
       ? rawCallbackUrl
       : "/cms";
+
+  // Auto-login if redirected from signup
+  useEffect(() => {
+    if (autoLogin && autoLoginToken) {
+      handleAutoLogin();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLogin, autoLoginToken]);
+
+  const handleAutoLogin = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Get credentials from token
+      const tokenResponse = await fetch(`/api/auth/auto-login?token=${autoLoginToken}`);
+      
+      if (!tokenResponse.ok) {
+        throw new Error("Invalid or expired token");
+      }
+
+      const credentials = await tokenResponse.json();
+
+      // Clear URL parameters for security
+      router.replace("/auth/login");
+
+      // Login with credentials
+      const result = await signIn("credentials", {
+        email: credentials.email,
+        password: credentials.password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Auto-login failed. Please try logging in manually.");
+        setLoading(false);
+      } else {
+        // Redirect to CMS
+        router.push(callbackUrl);
+        router.refresh();
+      }
+    } catch (err: any) {
+      setError("Auto-login failed. Please try logging in manually.");
+      setLoading(false);
+      router.replace("/auth/login");
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,8 +93,36 @@ export default function LoginForm() {
         setError("Invalid email or password");
         setLoading(false);
       } else {
-        router.push(callbackUrl);
-        router.refresh();
+        // Check if we're on a subdomain
+        const hostname = window.location.hostname;
+        const parts = hostname.split(".");
+        const isSubdomain = parts.length > 2 && parts[0] !== "www" && parts[0] !== "api";
+        
+        if (isSubdomain) {
+          // Stay on subdomain, go to CMS
+          router.push(callbackUrl);
+          router.refresh();
+        } else {
+          // On main domain - fetch user profile to get username and redirect to subdomain
+          try {
+            const profileResponse = await fetch("/api/auth/profile");
+            if (profileResponse.ok) {
+              const data = await profileResponse.json();
+              const profile = data?.profile;
+              if (profile?.username) {
+                // Redirect to user's subdomain
+                window.location.href = `https://${profile.username}.helppages.ai${callbackUrl}`;
+                return;
+              }
+            }
+          } catch (err) {
+            console.error("Error fetching profile:", err);
+          }
+          
+          // Fallback to regular redirect
+          router.push(callbackUrl);
+          router.refresh();
+        }
       }
     } catch (err: any) {
       setError(err.message || "Something went wrong");

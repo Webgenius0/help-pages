@@ -51,14 +51,20 @@ export async function GET(request: NextRequest) {
         } as any,
         include: {
           pages: {
-            where: { parentId: null },
+            where: { 
+              parentId: null,
+              docItemId: docItemId as any, // Ensure pages belong to this item
+            },
             select: { id: true, title: true, slug: true, status: true, position: true },
             orderBy: { position: "asc" },
           },
           children: {
             include: {
               pages: {
-                where: { parentId: null },
+                where: { 
+                  parentId: null,
+                  docItemId: docItemId as any, // Ensure pages belong to this item
+                },
                 select: { id: true, title: true, slug: true, status: true, position: true },
                 orderBy: { position: "asc" },
               },
