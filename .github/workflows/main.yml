@@ -4,11 +4,13 @@ on:
   push:
     branches:
       - main
-      - emon
 
 jobs:
   web-deploy:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       # 1️⃣ Checkout code
@@ -40,24 +42,13 @@ jobs:
           pm2 delete helppages || true
           pm2 start npm --name "helppages" -- run start
 
-      # 7️⃣ Deploy via SFTP (emon branch)
-      - name: 📂 Deploy to Softvence SFTP
-        if: github.ref == 'refs/heads/emon'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ftp.softvencefsd.xyz
-          username: gmcallister@gmcallister.softvencefsd.xyz
-          password: Password@432!
-          port: 22            # SFTP port
-          protocol: sftp
-
-      # 8️⃣ Deploy via SFTP (main branch)
+      # 8️⃣ Deploy via SFTP for 'main' branch
       - name: 📂 Deploy to PDSAI SFTP
         if: github.ref == 'refs/heads/main'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: 40.74.216.122
-          username: helppages_ftp
-          password: Password@4321!
-          port: 22            # SFTP port
+          username: ${{ secrets.FTP_USERNAME }} 
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 22 # SFTP port
           protocol: sftp
