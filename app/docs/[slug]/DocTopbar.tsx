@@ -353,13 +353,15 @@ export function DocTopbar({
 
         {/* Center: Dropdowns Navigation */}
         {navHeaders && navHeaders.length > 0 && (
-          <nav className="hidden md:flex items-center gap-1.5 md:gap-2 lg:gap-3 xl:gap-5 flex-1 justify-center min-w-0 overflow-hidden">
+          <nav className="hidden md:flex items-center gap-1.5 md:gap-2 lg:gap-3 xl:gap-5 flex-1 justify-center min-w-0">
             {navHeaders.map((dropdown) => {
+              // Ensure items is always an array
+              const items = dropdown.items || [];
               const isHovered = hoveredDropdownId === dropdown.id;
-              const hasActiveItem = dropdown.items.some(
+              const hasActiveItem = items.some(
                 (item) => item.id === selectedDocItemId
               );
-              const activeItem = dropdown.items.find(
+              const activeItem = items.find(
                 (item) => item.id === selectedDocItemId
               );
 
@@ -398,9 +400,13 @@ export function DocTopbar({
                   </button>
 
                   {/* Dropdown Menu */}
-                  {isHovered && dropdown.items.length > 0 && (
-                    <div className="absolute top-full left-0 mt-1 min-w-[280px] bg-popover border border-border/60 rounded-lg shadow-xl z-50 py-1.5 animate-in fade-in-0 zoom-in-95">
-                      {dropdown.items.map((item) => {
+                  {isHovered && items.length > 0 && (
+                    <div
+                      className="dropdown-menu absolute top-full left-0 mt-0.5 min-w-[280px] bg-background border border-border rounded-lg shadow-xl z-50 py-1.5"
+                      onMouseEnter={() => setHoveredDropdownId(dropdown.id)}
+                      onMouseLeave={() => setHoveredDropdownId(null)}
+                    >
+                      {items.map((item) => {
                         const isSelected = item.id === selectedDocItemId;
                         return (
                           <button

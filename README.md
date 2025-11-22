@@ -1,358 +1,317 @@
-# HelpPages Documentation Platform 📚
+# HelpPages - Documentation Platform
 
-A comprehensive, Supabase-styled documentation platform built with Next.js 14, featuring advanced content management, version control, search, analytics, and more.
+A modern, multi-tenant documentation platform built with Next.js 14, featuring subdomain-based CMS, hierarchical navigation, version control, and comprehensive content management.
 
-![Supabase Green Theme](https://img.shields.io/badge/Theme-Supabase-3ECF8E?style=for-the-badge)
-![Next.js 14](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge)
-![Prisma](https://img.shields.io/badge/Prisma-5-2D3748?style=for-the-badge)
+## 🎯 What is HelpPages?
 
-## ✨ Features Implemented (12/14)
+HelpPages is a SaaS documentation platform that allows users to create and manage beautiful documentation sites. Each user gets their own subdomain (e.g., `username.helppages.ai`) where they can access their CMS and publish documentation.
 
-### Core Features
-- ✅ **Database Schema** - Complete with users, pages, categories, revisions, analytics
-- ✅ **Global Search** - Real-time search with fuzzy matching and keyword highlighting
-- ✅ **User Roles & Permissions** - Admin, Editor, Viewer with granular permissions
-- ✅ **Public/Private Pages** - Access control for documentation visibility
-- ✅ **Autosave & Drafts** - Auto-save every 3 seconds with visual feedback
-- ✅ **Version Control** - Complete revision history with restore capability
-- ✅ **Export Functionality** - Markdown, HTML export (PDF coming soon)
-- ✅ **Analytics Tracking** - Page views, search queries, and usage stats
-- ✅ **REST API** - Full CRUD API with API key authentication
-- ✅ **Breadcrumb Navigation** - Visual page hierarchy
-- ✅ **Custom Branding** - Logo, colors, fonts, custom domain
-- ✅ **Category Management** - Create nested categories and subcategories
+### Key Features
 
-### Pending Features
-- 🚧 **Rich Text Editor** - Tiptap with slash commands (implementation guide provided)
-- 🚧 **Drag-and-Drop** - Reorder sidebar items (implementation guide provided)
+- **Subdomain-Based CMS**: Each user gets a unique subdomain for their documentation
+- **Hierarchical Navigation**: Dropdowns → Items → Sections → Pages structure
+- **Content Management**: Create, edit, and organize documentation pages
+- **Version Control**: Track changes and restore previous versions
+- **Search**: Global search across all documentation
+- **User Roles**: Admin, Editor, and Viewer roles with granular permissions
+- **Public/Private Docs**: Control visibility of your documentation
+- **Responsive Design**: Works seamlessly on mobile, tablet, and desktop
+- **Dark Mode**: Automatic theme switching based on system preferences
 
-## 🎨 Design
+## 🏗️ Architecture Overview
 
-- **Theme:** Supabase-inspired with #3ECF8E green
-- **Responsive:** Mobile, tablet, and desktop optimized
-- **Dark Mode:** Full support with automatic color switching
-- **Accessibility:** WCAG 2.1 AA compliant
+### Subdomain System
 
-## 🚀 Quick Start
+The platform uses a subdomain-based architecture:
+
+- **Main Domain** (`helppages.ai`): Landing page, signup, and login
+- **User Subdomains** (`username.helppages.ai`): Each user's personal CMS and documentation
+
+When a user signs up:
+1. They choose a username
+2. Their subdomain is automatically created: `username.helppages.ai`
+3. They can access their CMS at `https://username.helppages.ai/cms`
+4. Their public docs are available at `https://username.helppages.ai/docs`
+
+### Navigation Structure
+
+The documentation uses a hierarchical structure:
+
+```
+Dropdown (e.g., "Products")
+  └── Item (e.g., "Database")
+      ├── Pages (directly in item)
+      └── Sections
+          ├── Pages (in section)
+          └── Subsections
+              └── Pages (in subsection)
+```
+
+### Database Schema
+
+- **Users**: Authentication and user profiles
+- **Docs**: Documentation projects
+- **NavHeaders**: Dropdown menus and sections
+- **DocItems**: Items within dropdowns
+- **Pages**: Individual documentation pages
+- **PageRevisions**: Version history
+
+## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ 
+
+- Node.js 18 or higher
 - PostgreSQL database
 - npm or yarn
 
 ### Installation
 
-1. **Clone and install dependencies:**
+1. **Clone the repository:**
 ```bash
-git clone <your-repo>
-cd helppages
+git clone <repository-url>
+cd superbase-docs
+```
+
+2. **Install dependencies:**
+```bash
 npm install
 ```
 
-2. **Set up environment variables:**
-Create `.env.local`:
+3. **Set up environment variables:**
+
+Create a `.env.local` file in the root directory:
+
 ```env
+# Database
 DATABASE_URL="postgresql://user:password@localhost:5432/helppages"
-NEXTAUTH_SECRET="your-secret-key-here"
+
+# NextAuth
+NEXTAUTH_SECRET="your-secret-key-here-generate-a-random-string"
 NEXTAUTH_URL="http://localhost:3000"
+
+# Optional: Custom domain
+NEXT_PUBLIC_DOMAIN="helppages.ai"
 ```
 
-3. **Run database migrations:**
+4. **Set up the database:**
 ```bash
-npx prisma migrate dev
+# Generate Prisma Client
 npx prisma generate
+
+# Run migrations
+npx prisma migrate dev
+
+# (Optional) Seed with sample data
+npm run seed
 ```
 
-4. **Start development server:**
+5. **Start the development server:**
 ```bash
 npm run dev
 ```
 
-5. **Access the application:**
-- App: http://localhost:3000
-- Dashboard: http://localhost:3000/dashboard
-- Settings: http://localhost:3000/dashboard/settings
+6. **Access the application:**
+- Main site: http://localhost:3000
+- CMS Dashboard: http://localhost:3000/cms (after login)
 
-## 📖 Documentation
+## 📖 How to Use
 
-### Complete Guides
-- **[Features Summary](FEATURES_SUMMARY.md)** - Complete feature list with usage examples
-- **[Implementation Guide](IMPLEMENTATION_GUIDE.md)** - API docs, best practices, deployment
+### For End Users
 
-### Key Components
+1. **Sign Up**: Create an account at the main domain
+2. **Access Your CMS**: You'll be redirected to your subdomain CMS
+3. **Create Documentation**: 
+   - Create a new documentation project
+   - Add dropdowns (e.g., "Products", "Guides")
+   - Add items to dropdowns (e.g., "Database", "Auth")
+   - Create pages and sections
+4. **Publish**: Make your docs public to share with others
 
-#### Search
-```tsx
-import { SearchBar } from '@/app/components/SearchBar';
-<SearchBar />
-```
+### For Developers
 
-#### Version History
-```tsx
-import { VersionHistory } from '@/app/components/VersionHistory';
-<VersionHistory pageId={page.id} onRestore={handleRestore} />
-```
-
-#### Export
-```tsx
-import { ExportButton } from '@/app/components/ExportButton';
-<ExportButton pageId={page.id} pageName={page.slug} />
-```
-
-#### Breadcrumb
-```tsx
-import { Breadcrumb } from '@/app/components/Breadcrumb';
-<Breadcrumb items={[
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Current Page" }
-]} />
-```
-
-### Permissions
-```typescript
-import { canPerformAction, requireRole } from '@/lib/permissions';
-
-// Check permission
-const canEdit = canPerformAction(user, 'canEdit');
-
-// Require role (throws if unauthorized)
-requireRole(user, ['admin', 'editor']);
-```
-
-### Autosave
-```typescript
-import { useAutosave } from '@/hooks/useAutosave';
-
-const { isSaving, lastSaved } = useAutosave(data, {
-  delay: 3000,
-  onSave: async (data) => { /* save logic */ },
-});
-```
-
-## 🔌 API Reference
-
-### Authentication
-All endpoints support:
-- **Session-based**: Automatic with Next-Auth
-- **API Key**: Pass `x-api-key` header
-
-### Endpoints
-
-#### Pages
-```
-GET    /api/v1/pages              List pages (with pagination)
-POST   /api/v1/pages              Create page
-GET    /api/v1/pages/[id]         Get page
-PATCH  /api/v1/pages/[id]         Update page
-DELETE /api/v1/pages/[id]         Delete page (admin only)
-```
-
-#### Search
-```
-GET    /api/search?q=query        Search all content
-```
-
-#### Revisions
-```
-GET    /api/pages/[id]/revisions  List revisions
-POST   /api/pages/[id]/restore    Restore revision
-```
-
-#### Export
-```
-GET    /api/export?format=markdown&pageId=x   Export page
-```
-
-#### Analytics
-```
-POST   /api/analytics/track       Track page view
-```
-
-### Example API Usage
-```bash
-# Create a page
-curl -X POST http://localhost:3000/api/v1/pages \
-  -H "x-api-key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "Getting Started",
-    "slug": "getting-started",
-    "content": "# Welcome\n\nYour content here...",
-    "status": "published",
-    "isPublic": true
-  }'
-```
-
-## 👥 User Roles
-
-### Admin
-- Full CRUD access
-- Manage users and roles
-- Access settings and branding
-- View analytics
-- Delete any content
-
-### Editor
-- Create and edit all pages
-- Publish pages
-- View analytics
-- Cannot delete content or manage users
-
-### Viewer
-- Read-only access
-- Can view public and assigned pages
-- Cannot create or edit
-
-### Changing Roles
-```sql
--- Via database
-UPDATE users SET role = 'admin' WHERE email = 'user@example.com';
-```
-
-## 🎯 Next Steps
-
-### 1. Rich Text Editor (1-2 days)
-Install Tiptap and implement slash commands:
-```bash
-npm install @tiptap/react @tiptap/pm @tiptap/starter-kit
-```
-See `FEATURES_SUMMARY.md` for complete implementation guide.
-
-### 2. Drag-and-Drop (1 day)
-Install dnd-kit and make sidebar sortable:
-```bash
-npm install @dnd-kit/core @dnd-kit/sortable
-```
-See `FEATURES_SUMMARY.md` for complete implementation guide.
-
-## 📁 Project Structure
+#### Project Structure
 
 ```
-helppages/
+superbase-docs/
 ├── app/
-│   ├── api/                    # API routes
-│   │   ├── auth/              # Authentication
-│   │   ├── pages/             # Page CRUD
-│   │   ├── search/            # Search endpoint
-│   │   ├── export/            # Export endpoint
-│   │   ├── analytics/         # Analytics tracking
-│   │   └── v1/                # REST API v1
-│   ├── components/            # Reusable components
-│   │   ├── SearchBar.tsx      # Global search
-│   │   ├── Breadcrumb.tsx     # Navigation breadcrumb
-│   │   ├── VersionHistory.tsx # Version control UI
-│   │   ├── ExportButton.tsx   # Export functionality
-│   │   ├── Header.tsx         # Top navigation
-│   │   └── Sidebar.tsx        # Sidebar navigation
-│   ├── dashboard/             # Dashboard pages
-│   │   ├── pages/             # Page management
-│   │   ├── settings/          # Branding settings
-│   │   └── categories/        # Category management
-│   └── globals.css            # Supabase theme
-├── hooks/
-│   ├── useAutosave.ts         # Autosave hook
-│   └── useDebounce.ts         # Debounce hook
+│   ├── api/              # API routes
+│   │   ├── auth/        # Authentication endpoints
+│   │   ├── docs/        # Documentation CRUD
+│   │   ├── pages/       # Page management
+│   │   ├── nav-headers/ # Navigation management
+│   │   └── doc-items/   # Item management
+│   ├── auth/            # Authentication pages
+│   │   ├── login/       # Login page
+│   │   └── signup/      # Signup page
+│   ├── cms/             # CMS dashboard
+│   │   ├── docs/        # Documentation management
+│   │   ├── pages/       # Page editor
+│   │   └── settings/    # User settings
+│   ├── docs/            # Public documentation viewer
+│   │   └── [slug]/      # Individual doc pages
+│   ├── components/      # Reusable components
+│   └── globals.css      # Global styles
 ├── lib/
-│   ├── permissions.ts         # Permission utilities
-│   ├── auth.ts                # Auth helpers
-│   └── prisma.ts              # Prisma client
+│   ├── auth.ts          # Authentication utilities
+│   ├── subdomain.ts     # Subdomain detection
+│   ├── prisma.ts        # Prisma client
+│   └── slug.ts          # Slug generation
 ├── prisma/
-│   └── schema.prisma          # Database schema
-├── FEATURES_SUMMARY.md        # Complete feature list
-├── IMPLEMENTATION_GUIDE.md    # Implementation details
-└── README.md                  # This file
+│   ├── schema.prisma    # Database schema
+│   └── seed.ts          # Database seeding
+├── middleware.ts        # Subdomain routing
+└── README.md            # This file
 ```
 
-## 🛠 Tech Stack
+#### Key Components
 
-- **Framework:** Next.js 14 (App Router)
-- **Language:** TypeScript
-- **Database:** PostgreSQL
-- **ORM:** Prisma
-- **Auth:** NextAuth.js
-- **Styling:** Tailwind CSS
-- **Theme:** Supabase Design System
-- **Icons:** Lucide React
+- **Subdomain Detection**: `lib/subdomain.ts` - Detects and handles subdomain routing
+- **Authentication**: `lib/auth.ts` - User authentication and profile management
+- **CMS Dashboard**: `app/cms/` - Content management interface
+- **Public Docs**: `app/docs/` - Public-facing documentation viewer
+
+#### API Endpoints
+
+**Authentication:**
+- `POST /api/auth/signup` - Create new user
+- `POST /api/auth/login` - User login
+- `GET /api/auth/profile` - Get user profile
+
+**Documentation:**
+- `GET /api/docs` - List user's documentation projects
+- `POST /api/docs` - Create new documentation
+- `GET /api/docs/[id]` - Get documentation details
+- `PUT /api/docs/[id]` - Update documentation
+- `DELETE /api/docs/[id]` - Delete documentation
+
+**Navigation:**
+- `GET /api/nav-headers?docId=...` - Get dropdowns/sections
+- `POST /api/nav-headers` - Create dropdown/section
+- `GET /api/doc-items?navHeaderId=...` - Get items in dropdown
+- `POST /api/doc-items` - Create item
+
+**Pages:**
+- `GET /api/pages?docId=...&docItemId=...` - Get pages
+- `POST /api/pages` - Create page
+- `GET /api/pages/[id]` - Get page details
+- `PUT /api/pages/[id]` - Update page
+- `DELETE /api/pages/[id]` - Delete page
+
+## 🔧 Configuration
+
+### Subdomain Setup
+
+For production, you need to configure wildcard subdomain DNS and web server:
+
+1. **DNS Configuration**: Add a wildcard A record:
+   - `*.helppages.ai` → Your server IP
+
+2. **Server Configuration**: Configure your web server (Nginx/Apache) to handle wildcard subdomains:
+   - Set up wildcard SSL certificate (`*.helppages.ai`)
+   - Configure server to accept all subdomains
+   - Proxy requests to your Next.js application (default port 3000)
+   - Ensure the `Host` header is passed correctly to Next.js
+
+3. **Environment Variables**: Set `NEXT_PUBLIC_DOMAIN` to your domain
+
+**Note**: The application handles subdomain routing automatically via `middleware.ts`. You just need to ensure your web server proxies all subdomain requests to the Next.js app.
+
+### Database
+
+The application uses PostgreSQL with Prisma ORM. Key models:
+
+- **User**: User accounts and authentication
+- **Doc**: Documentation projects
+- **NavHeader**: Navigation dropdowns and sections
+- **DocItem**: Items within dropdowns
+- **Page**: Individual documentation pages
+
+## 🎨 Styling
+
+The platform uses Tailwind CSS with a Supabase-inspired design:
+
+- **Primary Color**: #3ECF8E (Supabase green)
+- **Dark Mode**: Automatic based on system preference
+- **Responsive**: Mobile-first design approach
+
+## 🔐 Security
+
+- **Authentication**: NextAuth.js with secure session management
+- **Authorization**: Role-based access control (Admin, Editor, Viewer)
+- **Subdomain Validation**: Users can only access their own subdomain
+- **SQL Injection Protection**: Prisma ORM prevents SQL injection
+- **XSS Protection**: React automatically escapes content
 
 ## 🚢 Deployment
 
-### Vercel (Recommended)
-```bash
-vercel
-```
+### Production Checklist
 
-### Environment Variables for Production
-```env
-DATABASE_URL="your-production-db-url"
-NEXTAUTH_SECRET="generate-strong-secret"
-NEXTAUTH_URL="https://your-domain.com"
-```
+1. **Database**: Set up PostgreSQL database
+2. **Environment Variables**: Configure all required env vars
+3. **DNS**: Set up wildcard subdomain DNS
+4. **Server**: Configure web server for subdomain routing
+5. **SSL**: Set up SSL certificates for all subdomains
+6. **Migrations**: Run `npx prisma migrate deploy`
 
-### Database Migration
-```bash
-npx prisma migrate deploy
-```
+### Recommended Platforms
 
-## 📊 Analytics
+- **Vercel**: Easy deployment with Next.js
+- **Railway**: Simple database and hosting
+- **DigitalOcean**: Full control with App Platform
+- **AWS/GCP**: Enterprise-grade hosting
 
-Track usage metrics:
-- Page views with referrer tracking
-- Search queries and popular searches
-- User engagement metrics
-- Most viewed pages
+## 📝 Development
 
-Access via API or implement dashboard UI.
-
-## 🔒 Security
-
-- ✅ Role-based access control
-- ✅ Permission checks on all routes
-- ✅ SQL injection protection (Prisma)
-- ✅ XSS protection (React)
-- ✅ CSRF protection (NextAuth)
-- ✅ API rate limiting (recommended to add)
-
-## 🧪 Testing
+### Available Scripts
 
 ```bash
-# Run tests (when implemented)
-npm run test
+# Development
+npm run dev          # Start dev server
 
-# Type checking
-npm run type-check
+# Production
+npm run build        # Build for production
+npm run start        # Start production server
 
-# Linting
-npm run lint
+# Database
+npx prisma generate  # Generate Prisma Client
+npx prisma migrate dev  # Run migrations
+npm run seed         # Seed database
+
+# Code Quality
+npm run lint         # Run ESLint
 ```
 
-## 📝 License
+### Adding New Features
 
-MIT License - feel free to use for personal and commercial projects.
+1. **Database Changes**: Update `prisma/schema.prisma` and run migrations
+2. **API Routes**: Add routes in `app/api/`
+3. **Components**: Create reusable components in `app/components/`
+4. **Pages**: Add pages in `app/` directory
 
 ## 🤝 Contributing
 
-Contributions welcome! Please:
 1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 💬 Support
+## 📄 License
 
-- **Documentation:** See IMPLEMENTATION_GUIDE.md and FEATURES_SUMMARY.md
-- **Issues:** Open a GitHub issue
-- **Questions:** Start a discussion
+MIT License - feel free to use for personal and commercial projects.
+
+## 🆘 Support
+
+- **Issues**: Open a GitHub issue for bugs or feature requests
+- **Questions**: Check the code comments and inline documentation
 
 ## 🎉 Acknowledgments
 
 - **Supabase** - Design inspiration
-- **Next.js Team** - Amazing framework
-- **Prisma Team** - Excellent ORM
+- **Next.js** - Amazing framework
+- **Prisma** - Excellent ORM
 - **Tailwind CSS** - Utility-first CSS
 
 ---
 
 **Built with ❤️ for the documentation community**
-
-**Status:** 12/14 features complete (86%) • Production-ready • Actively maintained
