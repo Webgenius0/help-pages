@@ -34,6 +34,52 @@ export const authOptions: NextAuthOptions = {
   ...(process.env.NEXTAUTH_URL && {
     url: process.env.NEXTAUTH_URL,
   }),
+  // Configure cookies to work across subdomains
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === "production" 
+        ? "__Secure-next-auth.session-token" 
+        : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // Set domain to base domain so cookies work across all subdomains
+        // For production: .helppages.ai
+        // For localhost: undefined (cookies work on localhost without domain)
+        domain: process.env.NODE_ENV === "production" 
+          ? process.env.NEXTAUTH_COOKIE_DOMAIN || ".helppages.ai"
+          : undefined,
+      },
+    },
+    callbackUrl: {
+      name: "next-auth.callback-url",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        domain: process.env.NODE_ENV === "production" 
+          ? process.env.NEXTAUTH_COOKIE_DOMAIN || ".helppages.ai"
+          : undefined,
+      },
+    },
+    csrfToken: {
+      name: process.env.NODE_ENV === "production"
+        ? "__Host-next-auth.csrf-token"
+        : "next-auth.csrf-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+        // Note: __Host- prefix requires no domain attribute, so we can't share across subdomains
+        // This is fine - CSRF token is less critical for cross-subdomain sharing
+        domain: undefined,
+      },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "credentials",

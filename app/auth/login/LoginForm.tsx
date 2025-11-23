@@ -3,32 +3,97 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { LoadingSpinner } from "@/app/components/LoadingSpinner";
 
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
   // Check for auto-login from signup
   const autoLogin = searchParams?.get("autoLogin") === "true";
   const autoLoginToken = searchParams?.get("token") || "";
 
   // Validate callbackUrl to prevent redirecting to non-existent routes
-  const rawCallbackUrl = searchParams?.get("callbackUrl") || "/cms";
+  // Handle both 'redirect' and 'callbackUrl' parameters (Next-Auth uses both)
+  const rawCallbackUrl =
+    searchParams?.get("callbackUrl") || searchParams?.get("redirect") || "/cms";
   // Only allow cms routes as callback URLs for security
   const callbackUrl =
     rawCallbackUrl.startsWith("/cms") &&
     !rawCallbackUrl.includes("/cms/all-courses")
       ? rawCallbackUrl
       : "/cms";
+
+  // Check if user is already authenticated when there's a redirect parameter
+  useEffect(() => {
+    const hasRedirect =
+      searchParams?.get("redirect") || searchParams?.get("callbackUrl");
+
+    // If there's no redirect parameter, don't check auth (show login form immediately)
+    if (!hasRedirect) {
+      setCheckingAuth(false);
+      return;
+    }
+
+    // If still loading session, show loading state
+    if (status === "loading") {
+      setCheckingAuth(true);
+      return;
+    }
+
+    // If authenticated and there's a redirect, redirect them
+    if (status === "authenticated" && session) {
+      setCheckingAuth(true);
+
+      // Small delay to ensure smooth transition
+      setTimeout(() => {
+        // Check if we're on a subdomain
+        const hostname = window.location.hostname;
+        const parts = hostname.split(".");
+        const isSubdomain =
+          parts.length > 2 && parts[0] !== "www" && parts[0] !== "api";
+
+        if (isSubdomain) {
+          // Stay on subdomain
+          window.location.href = callbackUrl;
+        } else {
+          // On main domain - fetch profile to get username
+          fetch("/api/auth/profile", {
+            credentials: "include",
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              const profile = data?.profile;
+              if (profile?.username) {
+                window.location.href = `https://${profile.username}.helppages.ai${callbackUrl}`;
+              } else {
+                window.location.href = callbackUrl;
+              }
+            })
+            .catch(() => {
+              window.location.href = callbackUrl;
+            });
+        }
+      }, 100);
+      return;
+    }
+
+    // Not authenticated - show login form
+    if (status === "unauthenticated") {
+      setCheckingAuth(false);
+    }
+  }, [status, session, searchParams, callbackUrl]);
 
   // Auto-login if redirected from signup
   useEffect(() => {
@@ -44,8 +109,10 @@ export default function LoginForm() {
 
     try {
       // Get credentials from token
-      const tokenResponse = await fetch(`/api/auth/auto-login?token=${autoLoginToken}`);
-      
+      const tokenResponse = await fetch(
+        `/api/auth/auto-login?token=${autoLoginToken}`
+      );
+
       if (!tokenResponse.ok) {
         throw new Error("Invalid or expired token");
       }
@@ -93,19 +160,38 @@ export default function LoginForm() {
         setError("Invalid email or password");
         setLoading(false);
       } else {
+        // Wait a moment for cookies to be set and session to be established
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Verify session is available before redirecting
+        try {
+          const sessionCheck = await fetch("/api/auth/profile", {
+            credentials: "include",
+          });
+
+          if (!sessionCheck.ok) {
+            // Session not ready yet, wait a bit more and try again
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        } catch (err) {
+          console.warn("Session check failed, proceeding with redirect:", err);
+        }
+
         // Check if we're on a subdomain
         const hostname = window.location.hostname;
         const parts = hostname.split(".");
-        const isSubdomain = parts.length > 2 && parts[0] !== "www" && parts[0] !== "api";
-        
+        const isSubdomain =
+          parts.length > 2 && parts[0] !== "www" && parts[0] !== "api";
+
         if (isSubdomain) {
-          // Stay on subdomain, go to CMS
-          router.push(callbackUrl);
-          router.refresh();
+          // Stay on subdomain, use hard redirect to ensure cookies are picked up
+          window.location.href = callbackUrl;
         } else {
           // On main domain - fetch user profile to get username and redirect to subdomain
           try {
-            const profileResponse = await fetch("/api/auth/profile");
+            const profileResponse = await fetch("/api/auth/profile", {
+              credentials: "include",
+            });
             if (profileResponse.ok) {
               const data = await profileResponse.json();
               const profile = data?.profile;
@@ -118,10 +204,9 @@ export default function LoginForm() {
           } catch (err) {
             console.error("Error fetching profile:", err);
           }
-          
-          // Fallback to regular redirect
-          router.push(callbackUrl);
-          router.refresh();
+
+          // Fallback to regular redirect with hard navigation
+          window.location.href = callbackUrl;
         }
       }
     } catch (err: any) {
@@ -129,6 +214,19 @@ export default function LoginForm() {
       setLoading(false);
     }
   };
+
+  // Show loading spinner if checking authentication or if there's a redirect parameter
+  if (
+    checkingAuth ||
+    (status === "loading" &&
+      (searchParams?.get("redirect") || searchParams?.get("callbackUrl")))
+  ) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <LoadingSpinner size="lg" text="Redirecting..." fullScreen={false} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">

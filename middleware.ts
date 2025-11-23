@@ -4,37 +4,37 @@ import type { NextRequest } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hostname = request.headers.get("host") || "";
-  
+
   // Extract subdomain from hostname
   // Examples:
   // - "johndoe.helppages.ai" → subdomain = "johndoe"
   // - "helppages.ai" → subdomain = null (main domain)
   // - "www.helppages.ai" → subdomain = null (www is ignored)
   const parts = hostname.split(".");
-  const isMainDomain = 
-    hostname === "helppages.ai" || 
+  const isMainDomain =
+    hostname === "helppages.ai" ||
     hostname === "www.helppages.ai" ||
     parts.length <= 2; // helppages.ai has 2 parts
-  
+
   let subdomain: string | null = null;
-  
+
   if (!isMainDomain && parts.length > 2) {
     // Extract subdomain (first part before the domain)
     subdomain = parts[0];
-    
+
     // Ignore common prefixes
     if (subdomain === "www" || subdomain === "api") {
       subdomain = null;
     }
   }
-  
+
   // Handle subdomain requests
   if (subdomain) {
     // Add subdomain to headers for server components and API routes
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-subdomain", subdomain);
     requestHeaders.set("x-hostname", hostname);
-    
+
     // Root path on subdomain should show home page, not CMS
     // Users can access CMS via: username.helppages.ai/cms
     // For all paths on subdomain, pass through with subdomain header
@@ -44,17 +44,35 @@ export function middleware(request: NextRequest) {
       },
     });
   }
-  
+
+  // Validate and clear invalid session tokens
+  const sessionToken =
+    request.cookies.get("next-auth.session-token") ||
+    request.cookies.get("__Secure-next-auth.session-token");
+
+  if (sessionToken) {
+    // Basic token format validation - if token looks invalid, clear it
+    // Full validation happens in server components via validateAndClearInvalidToken
+    const tokenValue = sessionToken.value;
+
+    // Check if token is empty or suspiciously short (JWT tokens are typically longer)
+    if (!tokenValue || tokenValue.length < 20) {
+      // Invalid token format - clear it
+      const response = NextResponse.next();
+      response.cookies.delete("next-auth.session-token");
+      response.cookies.delete("__Secure-next-auth.session-token");
+      response.cookies.delete("next-auth.csrf-token");
+      response.cookies.delete("__Host-next-auth.csrf-token");
+      return response;
+    }
+  }
+
   // Main domain behavior - redirect authenticated users to their subdomain
-  // Check if user is authenticated by checking for session cookie
-  const sessionToken = request.cookies.get("next-auth.session-token") || 
-                       request.cookies.get("__Secure-next-auth.session-token");
-  
   if (isMainDomain && sessionToken && (pathname === "/" || pathname === "")) {
     // User is logged in on main domain root - redirect will be handled by page component
     // which has access to user profile data
   }
-  
+
   if (isMainDomain && pathname.startsWith("/cms")) {
     if (sessionToken) {
       // User is logged in, but we need to get their username to redirect
@@ -91,4 +109,3 @@ export const config = {
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
   ],
 };
-

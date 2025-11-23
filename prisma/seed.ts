@@ -1,14 +1,39 @@
-import { PrismaClient } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
+import * as bcrypt from "bcryptjs";
+import { config } from "dotenv";
+import { resolve } from "path";
 
-const prisma = new PrismaClient();
+// Load environment variables from .env.local
+config({ path: resolve(process.cwd(), ".env.local") });
+// Also try .env as fallback
+config({ path: resolve(process.cwd(), ".env") });
+
+// Ensure DATABASE_URL is set
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL environment variable is required. Please set it in your .env.local file or environment."
+  );
+}
+
+// Create PostgreSQL adapter for Prisma 7
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const adapter = new PrismaPg(pool);
+
+const prisma = new PrismaClient({
+  adapter,
+});
 
 async function main() {
-  console.log('🌱 Starting database seeding...\n');
+  console.log("🌱 Starting database seeding...\n");
 
   // Clear all data (in correct order to respect foreign keys)
-  console.log('🗑️  Clearing existing data...');
-  
+  console.log("🗑️  Clearing existing data...");
+
   await prisma.pageFeedback.deleteMany();
   await prisma.pageView.deleteMany();
   await prisma.searchQuery.deleteMany();
@@ -16,32 +41,34 @@ async function main() {
   await prisma.pageRevision.deleteMany();
   await prisma.page.deleteMany();
   // Delete sections within docItems first
-  await (prisma as any).$executeRaw`DELETE FROM nav_headers WHERE doc_item_id IS NOT NULL`;
+  await (prisma as any)
+    .$executeRaw`DELETE FROM nav_headers WHERE doc_item_id IS NOT NULL`;
   // Delete docItems
   await (prisma as any).$executeRaw`DELETE FROM doc_items`;
   // Delete top-level navHeaders
-  await (prisma as any).$executeRaw`DELETE FROM nav_headers WHERE doc_item_id IS NULL AND parent_id IS NULL`;
+  await (prisma as any)
+    .$executeRaw`DELETE FROM nav_headers WHERE doc_item_id IS NULL AND parent_id IS NULL`;
   await prisma.doc.deleteMany();
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
   await prisma.verificationToken.deleteMany();
   await prisma.user.deleteMany();
-  
-  console.log('✅ Database cleared\n');
+
+  console.log("✅ Database cleared\n");
 
   // Create users
-  console.log('👤 Creating users...');
-  const hashedPassword = await bcrypt.hash('password123', 10);
-  
+  console.log("👤 Creating users...");
+  const hashedPassword = await bcrypt.hash("password123", 10);
+
   const admin = await prisma.user.create({
     data: {
-      email: 'admin@example.com',
-      username: 'admin',
+      email: "admin@example.com",
+      username: "admin",
       password: hashedPassword,
-      fullName: 'Admin User',
-      role: 'admin',
+      fullName: "Admin User",
+      role: "admin",
       isPublic: true,
-      bio: 'Administrator of the documentation platform',
+      bio: "Administrator of the documentation platform",
     },
   });
 
@@ -50,13 +77,13 @@ async function main() {
   try {
     editor = await prisma.user.create({
       data: {
-        email: 'editor@example.com',
-        username: 'editor',
+        email: "editor@example.com",
+        username: "editor",
         password: hashedPassword,
-        fullName: 'Editor User',
-        role: 'editor',
+        fullName: "Editor User",
+        role: "editor",
         isPublic: true,
-        bio: 'Content editor',
+        bio: "Content editor",
         createdBy: admin.id, // Editor created by admin
       } as any,
     });
@@ -77,20 +104,22 @@ async function main() {
         // Column doesn't exist yet - create without createdBy
         editor = await prisma.user.create({
           data: {
-            email: 'editor@example.com',
-            username: 'editor',
+            email: "editor@example.com",
+            username: "editor",
             password: hashedPassword,
-            fullName: 'Editor User',
-            role: 'editor',
+            fullName: "Editor User",
+            role: "editor",
             isPublic: true,
-            bio: 'Content editor',
+            bio: "Content editor",
           },
         });
       } else {
         // Column exists but Prisma client hasn't been regenerated - use raw SQL
         const result = await (prisma as any).$queryRaw`
           INSERT INTO users (email, username, password, full_name, role, is_public, bio, created_by, created_at, updated_at)
-          VALUES (${'editor@example.com'}, ${'editor'}, ${hashedPassword}, ${'Editor User'}, ${'editor'}, true, ${'Content editor'}, ${admin.id}, NOW(), NOW())
+          VALUES (${"editor@example.com"}, ${"editor"}, ${hashedPassword}, ${"Editor User"}, ${"editor"}, true, ${"Content editor"}, ${
+          admin.id
+        }, NOW(), NOW())
           RETURNING id, email, username, full_name as "fullName", role, is_public as "isPublic", bio, created_at as "createdAt"
         `;
         editor = result[0];
@@ -125,21 +154,21 @@ async function main() {
     return await (prisma as any).page.create({
       data: {
         ...data,
-        status: 'published',
+        status: "published",
         publishedAt: new Date(),
       },
     });
   };
 
   // Create 2 documentation projects
-  console.log('📚 Creating documentation projects...');
-  
+  console.log("📚 Creating documentation projects...");
+
   const apiDoc = await (prisma as any).doc.create({
     data: {
       userId: admin.id,
-      title: 'API Documentation',
-      slug: 'api-docs',
-      description: 'Complete API reference and guides for developers',
+      title: "API Documentation",
+      slug: "api-docs",
+      description: "Complete API reference and guides for developers",
       isPublic: true,
     },
   });
@@ -147,9 +176,9 @@ async function main() {
   const platformDoc = await (prisma as any).doc.create({
     data: {
       userId: admin.id,
-      title: 'Platform Documentation',
-      slug: 'platform-docs',
-      description: 'Platform features, guides, and tutorials',
+      title: "Platform Documentation",
+      slug: "platform-docs",
+      description: "Platform features, guides, and tutorials",
       isPublic: true,
     },
   });
@@ -159,13 +188,14 @@ async function main() {
   // Function to seed a doc with 5 dropdowns
   const seedDoc = async (doc: any, docName: string) => {
     console.log(`📂 Seeding ${docName}...`);
-    
+
     const dropdownNames = [
-      ['Products', 'Build', 'Manage', 'Reference', 'Resources'],
-      ['Getting Started', 'Guides', 'Tutorials', 'Examples', 'Resources']
+      ["Products", "Build", "Manage", "Reference", "Resources"],
+      ["Getting Started", "Guides", "Tutorials", "Examples", "Resources"],
     ];
-    const dropdownList = docName === 'API Docs' ? dropdownNames[0] : dropdownNames[1];
-    
+    const dropdownList =
+      docName === "API Docs" ? dropdownNames[0] : dropdownNames[1];
+
     // Create 5 dropdowns (NavHeaders)
     const dropdowns = [];
     for (let i = 0; i < 5; i++) {
@@ -173,7 +203,7 @@ async function main() {
         data: {
           docId: doc.id,
           label: dropdownList[i],
-          slug: dropdownList[i].toLowerCase().replace(/\s+/g, '-'),
+          slug: dropdownList[i].toLowerCase().replace(/\s+/g, "-"),
           position: i,
           parentId: null,
           docItemId: null,
@@ -186,22 +216,23 @@ async function main() {
     // For each dropdown, create 3 items (DocItems)
     for (const dropdown of dropdowns) {
       const itemNames = [
-        ['Database', 'Auth', 'Storage'],
-        ['Realtime', 'Edge Functions', 'Storage'],
-        ['Dashboard', 'CLI', 'API'],
-        ['REST API', 'GraphQL API', 'Webhooks'],
-        ['SDKs', 'Tools', 'Examples'],
+        ["Database", "Auth", "Storage"],
+        ["Realtime", "Edge Functions", "Storage"],
+        ["Dashboard", "CLI", "API"],
+        ["REST API", "GraphQL API", "Webhooks"],
+        ["SDKs", "Tools", "Examples"],
       ];
-      
-      const itemList = dropdown.label === 'Products' || dropdown.label === 'Getting Started' 
-        ? itemNames[0] 
-        : dropdown.label === 'Build' || dropdown.label === 'Guides'
-        ? itemNames[1]
-        : dropdown.label === 'Manage' || dropdown.label === 'Tutorials'
-        ? itemNames[2]
-        : dropdown.label === 'Reference' || dropdown.label === 'Examples'
-        ? itemNames[3]
-        : itemNames[4];
+
+      const itemList =
+        dropdown.label === "Products" || dropdown.label === "Getting Started"
+          ? itemNames[0]
+          : dropdown.label === "Build" || dropdown.label === "Guides"
+          ? itemNames[1]
+          : dropdown.label === "Manage" || dropdown.label === "Tutorials"
+          ? itemNames[2]
+          : dropdown.label === "Reference" || dropdown.label === "Examples"
+          ? itemNames[3]
+          : itemNames[4];
 
       const items = [];
       for (let i = 0; i < 3; i++) {
@@ -211,7 +242,7 @@ async function main() {
             ${generateId()},
             ${dropdown.id},
             ${itemList[i]},
-            ${itemList[i].toLowerCase().replace(/\s+/g, '-')},
+            ${itemList[i].toLowerCase().replace(/\s+/g, "-")},
             ${`Documentation for ${itemList[i]}`},
             ${i},
             ${i === 0},
@@ -227,19 +258,34 @@ async function main() {
       // For each item, create pages and sections
       for (let itemIdx = 0; itemIdx < items.length; itemIdx++) {
         const item = items[itemIdx];
-        
+
         // Create 3+ pages directly in the item
         const pageTitles = [
-          [`${item.label} Overview`, `Getting Started with ${item.label}`, `${item.label} Configuration`],
-          [`${item.label} Quick Start`, `${item.label} Setup Guide`, `${item.label} Best Practices`],
-          [`${item.label} Introduction`, `${item.label} Concepts`, `${item.label} Architecture`],
+          [
+            `${item.label} Overview`,
+            `Getting Started with ${item.label}`,
+            `${item.label} Configuration`,
+          ],
+          [
+            `${item.label} Quick Start`,
+            `${item.label} Setup Guide`,
+            `${item.label} Best Practices`,
+          ],
+          [
+            `${item.label} Introduction`,
+            `${item.label} Concepts`,
+            `${item.label} Architecture`,
+          ],
         ];
         const pagesList = pageTitles[itemIdx] || pageTitles[0];
-        
+
         for (let pageIdx = 0; pageIdx < pagesList.length; pageIdx++) {
           const title = pagesList[pageIdx];
-          const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-          
+          const slug = title
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "");
+
           await createPage({
             docId: doc.id,
             docItemId: item.id,
@@ -254,7 +300,9 @@ This is a comprehensive guide to ${title.toLowerCase()}.
 
 ## Overview
 
-${item.label} is a powerful feature that enables you to build robust and scalable applications. This documentation will guide you through everything you need to know.
+${
+  item.label
+} is a powerful feature that enables you to build robust and scalable applications. This documentation will guide you through everything you need to know.
 
 ### Key Features
 
@@ -316,7 +364,9 @@ const { data, error } = await client
 
 ### Understanding the Architecture
 
-The architecture of ${item.label} is designed for scalability and performance. Here's how it works:
+The architecture of ${
+              item.label
+            } is designed for scalability and performance. Here's how it works:
 
 1. **Request Layer**: Handles incoming requests and validates authentication
 2. **Processing Layer**: Processes business logic and data transformations
@@ -429,12 +479,12 @@ const { data, error } = await client
 
         // Create 2 sections (NavHeaders within the item)
         const sectionNames = [
-          ['Getting Started', 'Guides'],
-          ['Tutorials', 'Examples'],
-          ['Reference', 'API'],
+          ["Getting Started", "Guides"],
+          ["Tutorials", "Examples"],
+          ["Reference", "API"],
         ];
         const sectionsList = sectionNames[itemIdx] || sectionNames[0];
-        
+
         const sections = [];
         for (let secIdx = 0; secIdx < 2; secIdx++) {
           const section = await (prisma as any).navHeader.create({
@@ -442,7 +492,9 @@ const { data, error } = await client
               docId: doc.id,
               docItemId: item.id,
               label: `${item.label} ${sectionsList[secIdx]}`,
-              slug: `${item.slug}-${sectionsList[secIdx].toLowerCase().replace(/\s+/g, '-')}`,
+              slug: `${item.slug}-${sectionsList[secIdx]
+                .toLowerCase()
+                .replace(/\s+/g, "-")}`,
               position: secIdx,
               parentId: null,
             },
@@ -452,9 +504,11 @@ const { data, error } = await client
 
           // Create 2 pages within this section
           for (let secPageIdx = 0; secPageIdx < 2; secPageIdx++) {
-            const secPageTitle = `${sectionsList[secIdx]} Page ${secPageIdx + 1}`;
+            const secPageTitle = `${sectionsList[secIdx]} Page ${
+              secPageIdx + 1
+            }`;
             const secPageSlug = `${section.slug}-page-${secPageIdx + 1}`;
-            
+
             await createPage({
               docId: doc.id,
               docItemId: item.id,
@@ -534,7 +588,7 @@ This concludes our guide on ${secPageTitle}. For more information, check out our
           // Create 1 page within the subsection
           const subPageTitle = `${subsection.label} Content`;
           const subPageSlug = `${subsection.slug}-content`;
-          
+
           await createPage({
             docId: doc.id,
             docItemId: item.id,
@@ -574,30 +628,32 @@ const advancedExample = async () => {
 \`\`\``,
             position: 0,
           });
-          console.log(`          ✓ Created page in subsection: ${subPageTitle}`);
+          console.log(
+            `          ✓ Created page in subsection: ${subPageTitle}`
+          );
         }
       }
     }
-    
+
     console.log(`✅ Completed seeding ${docName}\n`);
   };
 
   // Seed both docs
-  await seedDoc(apiDoc, 'API Docs');
-  await seedDoc(platformDoc, 'Platform Docs');
+  await seedDoc(apiDoc, "API Docs");
+  await seedDoc(platformDoc, "Platform Docs");
 
-  console.log('🎉 Seeding completed successfully!\n');
-  console.log('📝 Sample credentials:');
-  console.log('   Admin: admin@example.com / password123');
-  console.log('   Editor: editor@example.com / password123\n');
-  console.log('🔗 Visit your docs at:');
+  console.log("🎉 Seeding completed successfully!\n");
+  console.log("📝 Sample credentials:");
+  console.log("   Admin: admin@example.com / password123");
+  console.log("   Editor: editor@example.com / password123\n");
+  console.log("🔗 Visit your docs at:");
   console.log(`   http://localhost:3000/docs/api-docs`);
   console.log(`   http://localhost:3000/docs/platform-docs\n`);
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seeding failed:', e);
+    console.error("❌ Seeding failed:", e);
     process.exit(1);
   })
   .finally(async () => {

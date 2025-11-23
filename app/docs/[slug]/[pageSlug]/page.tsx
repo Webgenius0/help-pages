@@ -101,45 +101,32 @@ export default async function PublicDocPagePage({
   let canEdit = false;
   // Note: Auth check happens client-side in the component if needed
 
-  // Try multiple slug variations to find the page (consider docItem if provided)
-  let page = await (prisma as any).page.findFirst({
-    where: {
-      docId: doc.id,
-      slug: decodedPageSlug,
-      status: "published",
-      ...(selectedItemId ? { docItemId: selectedItemId } : {}), // If no item selected, don't filter by docItemId
-    },
-    include: {
-      parent: true,
-      children: {
-        where: {
-          status: "published",
-        },
-        orderBy: {
-          position: "asc",
-        },
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          summary: true,
-          position: true,
-        },
-      },
-    },
-  });
-
-  // If not found with decoded slug, try original encoded version
-  if (!page) {
-    page = await (prisma as any).page.findFirst({
+  // Try multiple slug variations to find the page
+  // First try with item filter if provided, then without if not found
+  const findPage = async (slug: string, withItemFilter: boolean = false) => {
+    return await (prisma as any).page.findFirst({
       where: {
         docId: doc.id,
-        slug: rawPageSlug, // Use original raw slug
+        slug: slug,
         status: "published",
-        ...(selectedItemId ? { docItemId: selectedItemId } : { docItemId: null }),
+        ...(withItemFilter && selectedItemId
+          ? { docItemId: selectedItemId }
+          : {}), // Only filter by docItemId if explicitly requested
       },
-      include: {
-        parent: true,
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        summary: true,
+        content: true,
+        docItemId: true, // Include docItemId in response
+        parent: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        },
         children: {
           where: {
             status: "published",
@@ -157,6 +144,28 @@ export default async function PublicDocPagePage({
         },
       },
     });
+  };
+
+  // Try with item filter first if selectedItemId is provided
+  let page = selectedItemId
+    ? await findPage(decodedPageSlug, true)
+    : await findPage(decodedPageSlug, false);
+
+  // If not found with decoded slug and item filter, try without item filter
+  if (!page && selectedItemId) {
+    page = await findPage(decodedPageSlug, false);
+  }
+
+  // If not found with decoded slug, try original encoded version
+  if (!page) {
+    page = selectedItemId
+      ? await findPage(rawPageSlug, true)
+      : await findPage(rawPageSlug, false);
+
+    // If still not found with item filter, try without
+    if (!page && selectedItemId) {
+      page = await findPage(rawPageSlug, false);
+    }
   }
 
   // If still not found, try slugified version (lowercase, replace spaces with hyphens)
@@ -166,34 +175,16 @@ export default async function PublicDocPagePage({
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
 
-    // Only try slugified if it's different from the other two attempts
+    // Only try slugified if it's different from the other attempts
     if (slugified !== decodedPageSlug && slugified !== rawPageSlug) {
-      page = await (prisma as any).page.findFirst({
-        where: {
-          docId: doc.id,
-          slug: slugified,
-          status: "published",
-          ...(selectedItemId ? { docItemId: selectedItemId } : { docItemId: null }),
-        },
-        include: {
-          parent: true,
-          children: {
-            where: {
-              status: "published",
-            },
-            orderBy: {
-              position: "asc",
-            },
-            select: {
-              id: true,
-              title: true,
-              slug: true,
-              summary: true,
-              position: true,
-            },
-          },
-        },
-      });
+      page = selectedItemId
+        ? await findPage(slugified, true)
+        : await findPage(slugified, false);
+
+      // If still not found with item filter, try without
+      if (!page && selectedItemId) {
+        page = await findPage(slugified, false);
+      }
     }
   }
 

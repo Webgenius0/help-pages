@@ -67,6 +67,7 @@ interface Page {
   slug: string;
   summary: string | null;
   content: string;
+  docItemId?: string | null;
   parent: {
     id: string;
     title: string;
@@ -253,8 +254,85 @@ function PublicDocPageViewContent({
     }
   }, [canEdit, doc.id]);
 
+  // Collect all items from all dropdowns for topbar
+  const allItemsForTopbar: DocItem[] = [];
+  doc.navHeaders?.forEach((dropdown) => {
+    allItemsForTopbar.push(...(dropdown.items || []));
+  });
+
   // Update URL when selection changes
   const handleDocItemChange = (itemId: string | null) => {
+    // Check if current page belongs to the selected item
+    // First, check by docItemId if available
+    const currentPageBelongsToItemById = itemId 
+      ? page.docItemId === itemId 
+      : !page.docItemId || page.docItemId === null;
+    
+    // Also check if current page is in the selected item's pages list
+    let currentPageBelongsToItem = currentPageBelongsToItemById;
+    if (itemId) {
+      const selectedItem = allItemsForTopbar.find(item => item.id === itemId);
+      if (selectedItem) {
+        // Collect all pages from the selected item
+        const allItemPages: SidebarPage[] = [];
+        if (selectedItem.pages) {
+          allItemPages.push(...selectedItem.pages);
+        }
+        if (selectedItem.sections) {
+          selectedItem.sections.forEach((section) => {
+            if (section.pages) allItemPages.push(...section.pages);
+            if (section.subsections) {
+              section.subsections.forEach((subsection) => {
+                if (subsection.pages) allItemPages.push(...subsection.pages);
+              });
+            }
+          });
+        }
+        // Check if current page is in the list
+        const pageInItem = allItemPages.some(p => p.id === page.id);
+        currentPageBelongsToItem = currentPageBelongsToItemById || pageInItem;
+      }
+    }
+    
+    // If current page doesn't belong to the new item, navigate to first page of that item
+    if (!currentPageBelongsToItem && itemId) {
+      // Find the selected item and get its first page
+      const selectedItem = allItemsForTopbar.find(item => item.id === itemId);
+      
+      if (selectedItem) {
+        // Try to find the first page in the item
+        let firstPage: SidebarPage | null = null;
+        
+        // Check direct pages in item
+        if (selectedItem.pages && selectedItem.pages.length > 0) {
+          firstPage = selectedItem.pages[0];
+        } else if (selectedItem.sections && selectedItem.sections.length > 0) {
+          // Check pages in first section
+          const firstSection = selectedItem.sections[0];
+          if (firstSection.pages && firstSection.pages.length > 0) {
+            firstPage = firstSection.pages[0];
+          } else if (firstSection.subsections && firstSection.subsections.length > 0) {
+            // Check pages in first subsection
+            const firstSubsection = firstSection.subsections[0];
+            if (firstSubsection.pages && firstSubsection.pages.length > 0) {
+              firstPage = firstSubsection.pages[0];
+            }
+          }
+        }
+        
+        // Navigate to the first page of the selected item
+        if (firstPage) {
+          router.push(`/docs/${doc.slug}/${firstPage.slug}?item=${itemId}`);
+          return;
+        }
+      }
+      
+      // If no pages found, navigate to doc root with item parameter
+      router.push(`/docs/${doc.slug}?item=${itemId}`);
+      return;
+    }
+    
+    // If current page belongs to the item, just update the URL parameter
     setSelectedDocItemId(itemId);
     const params = new URLSearchParams(searchParams?.toString() || "");
     if (itemId) {
@@ -264,12 +342,6 @@ function PublicDocPageViewContent({
     }
     router.push(`?${params.toString()}`, { scroll: false });
   };
-
-  // Collect all items from all dropdowns for topbar
-  const allItemsForTopbar: DocItem[] = [];
-  doc.navHeaders?.forEach((dropdown) => {
-    allItemsForTopbar.push(...(dropdown.items || []));
-  });
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">

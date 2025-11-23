@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 
@@ -8,9 +10,19 @@ const globalForPrisma = global as unknown as { prisma: PrismaClient };
 // 2. Configure connection pooling for PostgreSQL
 // 3. Handle connection lifecycle properly
 
+// Create PostgreSQL adapter for Prisma 7
+const pool = process.env.DATABASE_URL
+  ? new Pool({
+      connectionString: process.env.DATABASE_URL,
+    })
+  : null;
+
+const adapter = pool ? new PrismaPg(pool) : undefined;
+
 export const prisma =
   globalForPrisma.prisma ||
   new PrismaClient({
+    adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
