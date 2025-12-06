@@ -1,4 +1,4 @@
-# HelpPages - Documentation Platform
+# HelpPages - Documentation Platform.
 
 A modern, multi-tenant documentation platform built with Next.js 14, featuring subdomain-based CMS, hierarchical navigation, version control, and comprehensive content management.
 
